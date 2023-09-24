@@ -90,6 +90,10 @@ trait <- ReorderData(tree, trait, taxa.names = "row names")
 trait$Armatures <- as.factor(trait$Armatures)
 trait$Taxon <- NULL
 
+# we need a slightly different format for Simmap:
+trait2 <- as.factor(trait$Armatures)
+names(trait2) <- rownames(trait)
+
 str(trait)
 ```
 
@@ -117,15 +121,15 @@ system.time(
 # Calculate AIC weights
 aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
 weights <- aicw(aic.discrete)
-weights # ARD model performs better for armature/no armature
+weights 
+
+# ARD model performs better for armature/no armature
 ```
 
 #### Estimate ancestral states via Simmap reconstruction
 
 ```{r}
-# we need a slightly different format for Simmap:
-trait2 <- as.factor(trait$Armatures)
-names(trait2) <- rownames(trait)
+
 
 # For 100 simulation (nsim=100) --> computing time = 167.91s
 system.time(
@@ -136,11 +140,15 @@ system.time(
 system.time(
   pd_mtrees <- describe.simmap(mtrees, plot = FALSE)
 )
+
+print(pd_mtrees)
+
+# saveRDS(mtrees, "output/multiSimmap_Armature.rds")
+# save.image("output/post_simmap_ws.RData")
 ```
 
 ```{r,  fig.show="hold", out.width="25%", fig.height=8, fig.width=8}
 # some visualizations of the simmap object and transitions
-save.image("output/post_simmap_ws.RData")
 
 
 densityMap_obj <- densityMap(mtrees, plot=F)
