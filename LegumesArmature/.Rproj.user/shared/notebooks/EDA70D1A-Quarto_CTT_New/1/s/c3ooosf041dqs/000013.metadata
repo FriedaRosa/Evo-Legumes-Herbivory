@@ -1,0 +1,1 @@
+{"height":409.76514215080348,"width":663.0,"size_behavior":0,"conditions":[[1,"Warning: \u001B[38;5;232mRemoved 479 rows containing missing values (`geom_point()`).\u001B[39m"],[1,"Warning: \u001B[38;5;232mRemoved 479 rows containing missing values (`geom_line()`).\u001B[39m"]]}
