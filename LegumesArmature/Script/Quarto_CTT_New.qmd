@@ -30,6 +30,9 @@ library(dplyr) # for data handling
 library(evobiR) # v. ‘1.1’ To reorder data based on tree
 library(geiger) # v. ‘2.0.11’ for Mk Models
 library(tictoc) # for time measurements of computations
+library(tidyr) # data handling
+library(ggplot2)
+library(viridis)
 ```
 
 # My Data (Legumes) \* read back in from RDS
@@ -660,50 +663,15 @@ rates_df %>%
   theme_light()
 
 
-changes_table %>% 
-  ungroup() %>%
-  ggplot(aes(x = time , y = rate, fill = as.factor(transition))) +
-  geom_bar()+
-  scale_fill_viridis(discrete=T, alpha = 0.6)+
-  theme_light()
+# changes_table_w_edge %>% 
+#   ungroup() %>%
+#   ggplot(aes(x = time , y = rate, fill = as.factor(transition))) +
+#   geom_bar()+
+#   scale_fill_viridis(discrete=T, alpha = 0.6)+
+#   theme_light()
 ```
 
-# Plot the rate 2
-
-```{r}
-library(ggplot2)
-library(viridis)
-rates_df %>% ungroup() %>% group_by(N_sim, transition) %>% 
-  ggplot(aes(x = segs_end , y = rate, group = as.factor(transition), col = as.factor(transition))) +
-  geom_point()+
-  geom_line()+
-  scale_color_viridis(discrete=T, alpha = 0.6)
-
-
-## Plots from pollination study:
-
-arm_to_no_arm <- rates_df %>%
-  dplyr::filter(transition == "armature->no_armature") %>%
-  dplyr::mutate(arm_to_no_arm = avg_time) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(arm_to_no_arm)
-
-no_arm_to_arm <- avg_trans_times %>%
-  dplyr::filter(transition == "no_armature->armature") %>%
-  dplyr::mutate(no_arm_to_arm = avg_time) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(no_arm_to_arm)
-
-# calculate density curve
-density_a2na <- density(arm_to_no_arm$arm_to_no_arm)
-density_na2a <- density(no_arm_to_arm$no_arm_to_arm)
-
-# plot the density
-plot(density_a2na, lwd = 2, col = myColours[1], 
-     xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
-     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
-lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
-```
+# 
 
 # My adaptation of Pollination study code
 
@@ -1234,6 +1202,43 @@ ggplot() +
 
 ```
 
+# Plot the rate 2
+
+```{r}
+library(ggplot2)
+library(viridis)
+rates_df %>% ungroup() %>% group_by(N_sim, transition) %>% 
+  ggplot(aes(x = segs_end , y = rate, group = as.factor(transition), col = as.factor(transition))) +
+  geom_point()+
+  geom_line()+
+  scale_color_viridis(discrete=T, alpha = 0.6)
+
+
+## Plots from pollination study:
+
+arm_to_no_arm <- rates_df %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::mutate(arm_to_no_arm = avg_time) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(arm_to_no_arm)
+
+no_arm_to_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::mutate(no_arm_to_arm = avg_time) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(no_arm_to_arm)
+
+# calculate density curve
+density_a2na <- density(arm_to_no_arm$arm_to_no_arm)
+density_na2a <- density(no_arm_to_arm$no_arm_to_arm)
+
+# plot the density
+plot(density_a2na, lwd = 2, col = myColours[1], 
+     xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
+     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
+lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
+```
+
 # Another try of rates plot
 
 ```{r}
@@ -1341,37 +1346,7 @@ legend("topleft",
 # \-- Plot.multiCtt function --
 
 ```{r}
-for(i in 1:length(object_list)){
-  x <- object_list
-  if(hasArg(alpha)) alpha<-list(...)$alpha else alpha<-0.05
-  segments<-x[[1]]$segments
-  nchanges<-sapply(x,function(x) x$nchanges)
-  if(hasArg(type)) type<-list(...)$type else type<-"rate"
-  edge.length<-sapply(x,function(x) x$edge.length)
-  obj<-list(segments=segments,nchanges=rowMeans(nchanges),
-            edge.length=rowMeans(edge.length),tree=x[[1]]$tree)
-  class(obj)<-"ctt"
-  lower<-max(floor(alpha/2*length(x)),1)
-  upper<-min(ceiling((1-alpha/2)*length(x)),ncol(nchanges))
-  xx<-max(nodeHeights(x[[1]]$tree))-as.vector(t(segments))
-  xx<-c(xx,xx[length(xx):1])
-  y.lower<-if(type=="number") apply(nchanges,1,sort)[lower,] else
-    if(type=="rate") apply(nchanges/edge.length,1,sort)[lower,]
-  y.upper<-if(type=="number") apply(nchanges,1,sort)[upper,] else
-    if(type=="rate") apply(nchanges/edge.length,1,sort)[upper,]
-  y.lower<-as.vector(rbind(y.lower,y.lower))
-  y.upper<-as.vector(rbind(y.upper,y.upper))
-  yy<-c(y.lower,y.upper[length(y.upper):1])
-  args<-list(...)
-  if(!is.null(args$alpha)) args$alpha<-NULL
-  if(is.null(args$col)) args$col<-"blue"
-  if(is.null(args$ylim)) args$ylim<-range(yy)
-  args$x<-obj
-  do.call(plot,args)
-  polygon(xx,yy,col=make.transparent("grey",0.4),border=0)
-}
-
-
+#| label: plot.multiCtt()
 
 
 plot.multiCtt<-function(x,...){

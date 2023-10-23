@@ -1,5 +1,0 @@
-"0","writeRDS(mtrees, ""../output/RDS/mtrees_multiSimmap.rds"")
-"
-"2","Error in writeRDS(mtrees, ""../output/RDS/mtrees_multiSimmap.rds"") : 
-  could not find function ""writeRDS""
-"
