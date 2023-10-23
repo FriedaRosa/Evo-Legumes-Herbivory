@@ -1,126 +1,139 @@
 ---
 title: "CTT_plot_New"
 author: "Friederike Wölke"
-format: html
+format: 
+  html:
+    code-fold: true
+    page-layout: full
 editor: visual
 ---
 
-# My adaptation of original CTT function
+### References for this code:
+
+The following code is a mixture of code written by **Liam Revell within the Phytools package**, especially from the source code of the ctt() function (version Oct 2023),
+
+and from the code for Figure 4 in **Stephens et al., (2023):** [Paper](https://nph.onlinelibrary.wiley.com/doi/10.1111/nph.18993); [GitHub Repo](https://github.com/rubysaltbush/pollination-macroevolution)
+
+Ref \[1\]
+
+Ref \[2\]
+
+Ref \[3\]
+
+# Open the required Libraries
 
 ```{r}
-## computing the mean number of character changes through time from a set of stochastic map trees
-## written by Liam J. Revell 2017, 2020
+rm(list=ls())
+
+library(phytools) # v. ‘1.9.16’ for phylo stuff
+library(dplyr) # for data handling
+library(evobiR) # v. ‘1.1’ To reorder data based on tree
+library(geiger) # v. ‘2.0.11’ for Mk Models
+library(tictoc) # for time measurements of computations
+```
+
+# My Data (Legumes) \* read back in from RDS
+
+```{r}
+# Read in the data and tree ============================
+
+traitData <- read.csv("../input/Matrix_all_traits.csv", stringsAsFactors = FALSE, header = TRUE)
+tree <- read.tree("../input/Mimo_metachronogram_mmc.tre")
+tree <- as.phylo(tree)
+new_tip_names<-read.csv("../input/replace_tip_labels.csv")
+
+# Subset data by trait 
+armature <- traitData %>% select(Taxon, Armatures) %>% filter(!is.na(Taxon) & !is.na(Armatures)) %>% distinct(.) # 2 species were duplicated (Acacia baileyana and Chidlowiana sanguinea)
+
+# Correct tip names in the tree with new labels
+tree2 <- tree
+tree2$tip.label <- new_tip_names[[2]][match(tree$tip.label, new_tip_names[[1]])]
 
 
-# adapted by Friederike Wölke 
+# Small subset with 10 species:
 
-ctt_relative<-function(trees,segments=20,...){
-  if(!(inherits(trees,"multiSimmap")))
-    stop("trees should be an object of class \"multiSimmap\".")
-  tree<-as.phylo(trees[[1]])
-  changes<-sapply(trees,getChanges)
-  h<-max(nodeHeights(tree))
-  b<-segments
-  segs<-cbind(seq(0,h-h/b,h/b),
-              seq(1/b*h,h,h/b))
-  
-  
-  # edge.length <- numberic(b)                                                  # ChatGPT
-  
-                                                                                # this is not part of ChatGPTs script (only the parallelized one)
-  nchanges<-rep(0,b)
-  for(i in 1:length(changes)){
-    for(j in 1:length(changes[[i]])){
-      ind<-which((changes[[i]][j]>segs[,1])+
-                   (changes[[i]][j]<=segs[,2])==2)
-      nchanges[ind]<-nchanges[ind]+1/length(changes)
-    }
-  }
-  
-  # this is part of both
-  LTT<-ltt(tree,plot=FALSE)
-  LTT<-cbind(LTT$ltt[2:(length(LTT$ltt)-1)],
-             LTT$times[2:(length(LTT$ltt)-1)],
-             LTT$times[3:length(LTT$ltt)])
-  ii<-1
-  
-  
-                                                                                # this is not part of ChatGPT
-  edge.length<-rep(0,b)
-  
-                                                                                # both
-  for(i in 1:nrow(segs)){
-    done.seg<-FALSE
-    while(LTT[ii,2]<=segs[i,2]&&done.seg==FALSE){
-      edge.length[i]<-edge.length[i]+
-        LTT[ii,1]*(min(segs[i,2],LTT[ii,3])-
-                     max(segs[i,1],LTT[ii,2]))
-      if(LTT[ii,3]>=segs[i,2]) done.seg<-TRUE
-      if(LTT[ii,3]<=segs[i,2]) ii<-if(ii<nrow(LTT)) ii+1 else ii
-    }
-  }
-  
-  
-  object<-list(segments=segs,nchanges=nchanges,edge.length=edge.length,tree=tree, 
-               rate=nchanges/edge.length)
-  class(object)<-"ctt"
-  object
-  
-}	
+#armature <- armature[1:10,]
 
-plot.ctt<-function(x,...){
-  h<-max(nodeHeights(x$tree))
-  args<-list(...)
-  if(!is.null(args$type)){ 
-    type<-args$type
-    args$type<-NULL
-  } else type<-"rate"
-  if(!is.null(args$show.tree)){
-    show.tree<-args$show.tree
-    args$show.tree<-NULL
-  } else show.tree<-FALSE
-  if(!is.null(args$add)){ 
-    add<-args$add
-    args$add<-NULL
-  } else add<-FALSE
-  if(is.null(args$ylim)) 
-    args$ylim<-c(0,max(x$nchanges/x$edge.length))
-  if(is.null(args$xlim))
-    args$xlim<-c(max(x$segments),min(x$segments))
-  if(is.null(args$lwd)) args$lwd<-2
-  if(is.null(args$xlab)) args$xlab<-"time since the present"
-  if(is.null(args$ylab)) 
-    args$ylab<- "mean number of changes / total edge length"
-  args$type<-"l"
-  args$x<-h-as.vector(t(x$segments))
-  args$y<-rbind(x$nchanges/x$edge.length,x$nchanges/x$edge.length)
-  if(!add) do.call(plot,args)
-  else do.call(lines,args)
-  if(show.tree) plotTree(x$tree,add=TRUE,ftype="off",lwd=1,
-                         color=make.transparent("blue",0.1),mar=par()$mar,
-                         direction="leftwards",xlim=args$xlim)
-}
 
-sim.ctt<-function(tree,Q,anc=NULL,nmaps=100,...){
-  x<-as.factor(sim.history(tree,Q,anc=anc,message=FALSE)$states)
-  while(length(levels(x))!=ncol(Q)) 
-    x<-as.factor(sim.history(tree,Q,anc=anc,message=FALSE)$states)
-  flush.console()
-  cat("Starting stochastic mapping with simulated data vector.... ")
-  flush.console()
-  trees<-make.simmap(tree,x,Q=Q,nsim=nmaps,message=FALSE)
-  cat("Done.\n")
-  flush.console()
-  ctt(trees,...)
-}
+# match data and tree ===================================
+row.names(armature) <- armature$Taxon
+sp_drop <- setdiff(tree2$tip.label, armature$Taxon)
 
-sim.multiCtt<-function(tree,Q,anc=NULL,nmaps=100,nsim=100,...){
-  object<-lapply(1:nsim,sim.ctt,tree=tree,Q=Q,anc=anc,nmaps=nmaps,...)
-  ##	object<-replicate(nsim,sim.ctt(tree,Q,anc=anc,nmaps=nmaps,...),simplify=FALSE)
-  class(object)<-"multiCtt"
-  object
-}
+# Drop these species from the tree, because we need matching data between tree and traits
+tree3 <- drop.tip(tree2, sp_drop)
+tree4 <- ladderize(tree3)
 
+matches <- match(armature$Taxon, tree4$tip.label, nomatch = 0)
+armature2 <- subset(armature, matches != 0)
+
+setdiff(tree4$tip.label, armature2$Taxon) # 0
+setdiff(armature2$Taxon, tree4$tip.label) # 0
+
+tree <- tree4
+
+# Make data for Mk models for Armature
+
+armature2[armature2=="0"] <- "no_armature"
+armature2[armature2=="1"] <- "armature"
+
+trait <- unique(armature2)
+trait <- ReorderData(tree, trait, taxa.names = "row names")
+
+trait$Armatures <- as.factor(trait$Armatures)
+trait$Taxon <- NULL
+
+# Clean environment to free memory:
+rm(tree2, tree3, tree4, traitData, new_tip_names, armature, matches, sp_drop)
+
+# Mk models ============================
+# estimate the rates of transitioning between ancestral states given a hypothesis (either equal rates(ER), or different rates(ARD))
+
+# computing time = 11.58s
+tic()
+  equal <- fitDiscrete(tree, trait, model = "ER")
+toc()
+
+# computing time = 42.85s
+tic()
+  ard <- fitDiscrete(tree, trait, model = "ARD")
+toc()
+
+# Calculate AIC weights
+aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
+weights <- aicw(aic.discrete)
+weights # ARD model performs better for armature/no armature
+
+# we need a slightly different format for Simmap:
+trait2 <- as.factor(trait$Armatures)
+names(trait2) <- rownames(trait)
+
+# For 100 simulation (nsim=100) --> computing time = 725.28s && 373.7 sec elapsed
+tic()
+  mtrees <- make.simmap(tree, trait2, model = "ARD", nsim = 100)
+toc()
+
+saveRDS(mtrees, "../output/RDS/mtrees_multiSimmap.rds")
+
+# 6.35s
+tic()
+  pd_mtrees <- describe.simmap(mtrees, plot = FALSE)
+toc()
+```
+
+# My adaptation of ctt function (in loop, save to list)
+
+Reference: [ctt.R](https://github.com/liamrevell/phytools/blob/master/R/ctt.R) (Phytools package)
+
+```         
+> packageVersion("phytools") [1] ‘1.9.16’
+```
+
+```{r}
+tic( "loop")
+rm(list=ls())
+mtrees <- readRDS("../output/RDS/mtrees_multiSimmap.rds")
+
+### Required function ========================================================================== #
 getChanges<-function(tree){
   states<-sort(unique(getStates(tree)))
   nc<-sapply(tree$maps,length)-1
@@ -140,59 +153,570 @@ getChanges<-function(tree){
   xx
 }
 
-print.ctt<-function(x,...){
-  cat("Object of class \"ctt\" consisting of:\n")
-  cat("   (1) a matrix (segments) with the beginning & ending time of each segment.\n")
-  cat("   (2) a vector (nchanges) with the mean number of changes in each segment.\n")
-  cat("   (3) a vector (edge.length) containing the total edge length of each segement.\n")
-  cat("   (4) an object of class \"phylo\".\n\n")
+
+
+# ============================================================================================= #
+# Create a function to find the segment ID for a given time value:
+# ============================================================================================= #
+
+find_segment_id <- function(time) {
+  segment_indices <- cut(time, breaks = segs_df[, 2], labels = FALSE)
+  return(segs_df$segsID[segment_indices])
 }
 
-print.multiCtt<-function(x,...){
-  cat(paste(length(x),"objects of class \"ctt\" in a list.\n\n"))
-}
+## ============================================================================================= #
 
-plot.multiCtt<-function(x,...){
-  if(hasArg(alpha)) alpha<-list(...)$alpha
-  else alpha<-0.05
-  segments<-x[[1]]$segments
-  nchanges<-sapply(x,function(x) x$nchanges)
-  if(hasArg(type)) type<-list(...)$type
-  else type<-"rate"
-  edge.length<-sapply(x,function(x) x$edge.length)
-  obj<-list(segments=segments,nchanges=rowMeans(nchanges),
-            edge.length=rowMeans(edge.length),tree=x[[1]]$tree)
-  class(obj)<-"ctt"
-  lower<-max(floor(alpha/2*length(x)),1)
-  upper<-min(ceiling((1-alpha/2)*length(x)),ncol(nchanges))
-  xx<-max(nodeHeights(x[[1]]$tree))-as.vector(t(segments))
-  xx<-c(xx,xx[length(xx):1])
-  y.lower<-if(type=="number") apply(nchanges,1,sort)[lower,] else
-    if(type=="rate") apply(nchanges/edge.length,1,sort)[lower,]
-  y.upper<-if(type=="number") apply(nchanges,1,sort)[upper,] else
-    if(type=="rate") apply(nchanges/edge.length,1,sort)[upper,]
-  y.lower<-as.vector(rbind(y.lower,y.lower))
-  y.upper<-as.vector(rbind(y.upper,y.upper))
-  yy<-c(y.lower,y.upper[length(y.upper):1])
-  args<-list(...)
-  if(!is.null(args$alpha)) args$alpha<-NULL
-  if(is.null(args$col)) args$col<-"blue"
-  if(is.null(args$ylim)) args$ylim<-range(yy)
-  args$x<-obj
-  do.call(plot,args)
-  polygon(xx,yy,col=make.transparent("grey",0.4),border=0)
-}
+
+  # ================================================================= #
+  # Working the multiSiammp
+  # ================================================================= #
+
+  
+  
+  # Get all changes from all simulations so that we can loop through them:
+  changes <- sapply(mtrees, getChanges) 
+  
+  
+  # Transform the original changes list of matrices from sapply() for all simulations to dataframe 
+  # add trans_no to each transition based on grouping by transition 
+  # (i.e, there are two trans_no = 1, one for each transition type)
+  
+  i_changes_list <- list() 
+  for (i in 1:length(changes)) {
+    
+    i_changes <- changes[[i]] # for each simulation from multiSimmap
+    
+    
+    # extract transition types and times and assign ID column for simmap simulation
+    i_changes_df <- data.frame(transition = names(i_changes), time = i_changes, N_sim = i)
+    i_changes_df$transition <- as.factor(i_changes_df$transition)
+    
+    # Add trans_no to each transition from a group (transition type)
+    i_changes_df <- i_changes_df %>%  arrange(time) %>%
+      group_by(transition) %>%
+      mutate(trans_no = row_number())
+    
+    i_changes_list[[i]] <- i_changes_df
+    
+  }
+  
+  # Final Table without edge.lengths:
+  changes_table <- plyr::rbind.fill(i_changes_list, fill=T)
+  changes_table_wo_edge <- changes_table
+
+
+  
+# ====================================================================================================== #
+## Step 1: Loop over each simulation and extract 
+# - breaks for segments
+# - edge.lengths
+# - rates for each character state transition
+# ====================================================================================================== #
+
+
+object_list <- list()
+rates_list <- list()
+
+
+
+# First Level of the loop  
+for (Nsimulation in 1:100){ 
+  
+  
+  # ====================================================================================================== #
+  # Setting global variables for the Analysis
+  # ====================================================================================================== #
+  
+  # set the number of time-segments for which everything will be calculated:
+  b <- 20    
+  
+  # reduce to one tree to extract parameters from each simulation separately:
+  tree <- as.phylo(mtrees[[Nsimulation]])
+  
+  # extract time since root
+  h <- max(nodeHeights(tree))
+  
+  # calculate the time segments based on time since the origin and the time segments that were set by the user
+  segs <- cbind(seq(0,h-h/b,h/b),
+              seq(1/b*h,h,h/b))
+
+  
+  # ====================================================================================================== #
+  # Transitions & Timing  (getChanges)
+  # ====================================================================================================== #
+  
+  
+  # ================================================================= #
+  # Working changes from each simmap simulation separately:
+  # ----------------------------------------------------------------- #
+  # Changes per Segments:
+  # ================================================================= #
+  
+
+# Loop through all changes & Calculate average number of changes per time interval (segs; set with "b")
+  
+  nchanges<-rep(0,b)
+  for(i in 1:length(changes)) { # loop through all simulations from simmap  
+
+# loop through all individual changes from one simmap simulation and calculate relative changes per time segment
+# nchanges = collects the relative number of changes (of all changes) per segment
+    
+    for(j in 1:length(changes[[i]])) { 
+      
+      ind<-which((changes[[i]][j]>segs[,1])+ 
+                   (changes[[i]][j]<=segs[,2])==2)
+      nchanges[ind]<-nchanges[ind]+1/length(changes)
+      
+      } # closing of 2nd level
+    
+    } # closing of 1st level
+
+  rm(i,j)  
+  
+  
+  # ================================================================= #
+  # Working changes from each simmap simulation separately:
+  # ----------------------------------------------------------------- #
+  # Edge Lengths per Segments:
+  # ================================================================= #
+
+  # Edge.Lengths = Number of species in the phylogeny per time slot (increases naturally with time)
+  # ! Note: has to be accounted for when showing transition rates
+  # Here we calculate edge lengths for each segement separatly:
+  
+  # -------------------------------------------------------------------------------------------------------- #
+  
+  # Compute Lineages-Through-Time with ltt() function from the phytools package to extract edge.lengths from
+  LTT <- ltt(tree,plot=FALSE)
+
+	# transform LTT data so that we can use it:
+  LTT <- cbind(LTT$ltt[2:(length(LTT$ltt)-1)],                # Number of species at each node minus the root
+               LTT$times[2:(length(LTT$ltt)-1)],              # "start" time for each node minus the root
+               LTT$times[3:length(LTT$ltt)])                  # "end" time for each node minus the root
+  
+  # -------------------------------------------------------------------------------------------------------- #
+  
+  ## Now we loop through all segments to extract matching edge.lengths =================================== #
+  
+  # set count variable:
+	ii<-1
+
+	# Create an empty vector to store edge lengths
+	edge.length <- rep(0, nrow(segs))
+
+	
+	# 2nd level loop: 
+	# (for one tree because LTT is calculated for one tree)
+   for (i_segs in 1:nrow(segs)) {
+     
+
+     # Find the indices of LTT segments that overlap with the current segs segment
+     overlap_indices <- which(LTT[, 2] <= segs[i_segs, 2] & LTT[, 3] >= segs[i_segs, 1])
+  
+
+     # Calculate edge length for the current segs segment using vectorized operations
+     # 3rd level loop: 
+     for (ii in overlap_indices) {
+     
+       # edge.length should contain the edge lengths for all segments:  
+       edge.length[i_segs] <- edge.length[i_segs] +        
+         LTT[ii, 1] * # counts number of lineages between time intervals
+         (min(segs[i_segs, 2], LTT[ii, 3]) - # end time interval
+            max(segs[i_segs, 1], LTT[ii, 2]))  # start time interval
+
+     
+       } # 3rd level closing
+     
+   } # 2nd level closing
+	
+	
+	edge.length_backup <- edge.length
+	edge.length <-c(1, edge.length)
+  # edge.length should contain the edge lengths for all segments in a given simulation
+ 	
+	# adding segsID coulmn to edge lengths:
+	edge.length_df <- data.frame(edge.length = edge.length, segsID = seq(1,b+1))
+	
+	
+	#########################################################################################################
+	# WIP: 
+	#########################################################################################################
+	
+	
+	
+	# ================================================================= #
+  # Working the multiSimmap:
+  # ----------------------------------------------------------------- #
+  # Edge Lengths at each transition event
+  # ================================================================= #
+	## Adapted code from the segments by me
+	
+	# we need the table for all simmaps: changes_table so that we can loop through it
+	
+	# set count variable:
+	ii<-1
+
+	# Create an empty vector to store edge lengths
+	edge.length_transitions <- rep(0, nrow(changes_table))
+  edge.lengths_all <- list()
+	changes_times <- changes_table$time
+	
+	
+	# 2nd level loop: 
+	# (for one tree because LTT is calculated for one tree)
+   for (i_changes in 1:nrow(changes_table)) {
+
+     # Find the indices of LTT segments that overlap with the current segs segment
+     
+     # "which start times of the Lineages are smaller or equal to the time the change happened and which end times of the lineages are larger or equal to the time the change happend."
+     # --> this gives the node numbers that were there when the transition happend
+     
+     overlap_indices <- which(LTT[, 2] <= changes_times[i_changes] & LTT[, 3] >= changes_times[i_changes])
+  
+
+     # Calculate edge length for the current segs segment using vectorized operations
+     # 3rd level loop: 
+     
+     for (ii in overlap_indices) { # ii = number of lineages when a transition occurred
+     
+       # edge.length should contain the edge lengths for all segments:  
+       edge.length_transitions[i_changes] <- edge.length_transitions[i_changes] +        
+         LTT[ii, 1] 
+       
+       edge.length_transitions2 <- data.frame(time = changes_times[i_changes], edge.length = edge.length_transitions[i_changes])
+
+     
+       edge.lengths_all[[i_changes]] <- edge.length_transitions2
+       
+       } # 3rd level closing
+     
+   } # 2nd level closing
+	
+  
+  edge.lengths_all_df <- plyr::rbind.fill(edge.lengths_all)
+  changes_table_w_edge <- merge(changes_table_wo_edge, edge.lengths_all_df, by = "time")
+  # Write to file (once is enough)
+  write.csv(changes_table_w_edge, "../output/CSV/changes_table_w_edgelengths.csv")
+	
+#########################################################################################################
+# END WIP 
+#########################################################################################################
+	
+     	  
+# ============================================================================================= #
+# Create a dataframe with transitions, times, edge.lengths, segment IDs.
+# ============================================================================================= #
+	  
+  ## We are here = first level loop: along simulations
+	  
+	 	# Again extract changes for each simulation separately:
+	  current_simulation <- as.data.frame(changes[[Nsimulation]], 
+	                                      row.names = names(changes[[Nsimulation]]))
+	  names(current_simulation) <- c("time")
+	  current_simulation$transition <- rownames(current_simulation)
+	 	current_simulation$N_sim <- Nsimulation
+	 	current_simulation <- current_simulation %>% arrange(time)
+	 	current_simulation$IDtransition <- seq(1:nrow(current_simulation))
+
+	 	
+	 	# ============================================================================================= #
+	 	# Working the segments: 
+	 	# ============================================================================================= #
+
+	 	
+	 	# Create a vector of segment IDs
+	 	segs_df <- as.data.frame(segs)
+	 	new_row <- data.frame(V1 = 0, V2 = 0)
+	 	segs_df <- rbind(new_row, segs_df)
+	 	segs_df$segsID <- seq(1,b+1) # now we can calculate the breaks from it
+
+	 	# Use the apply function to find the segment ID for each row in current_simulation
+	 	current_simulation$segsID <- apply(current_simulation, 1, function(row) {
+  
+	 	  time <- as.numeric(row["time"])
+	 	  return(find_segment_id(time))
+
+	 	  }) # closing loop from within the apply-function (2nd level loop closing)
+
+	
+	 	# assign edge.length based on segment ID
+	 	current_simulation <- unique(merge(current_simulation, edge.length_df, by="segsID", all = T))
+	 	names(segs_df) <- c("segs_start", "segs_end", "segsID")
+	  current_simulation <-	unique(merge(current_simulation, segs_df, by = "segsID", all = T))
+	 	
+	  # Calculate rate for each simulation:
+	 	current_simulation_rates <- current_simulation %>% 
+	 	  group_by(segsID, N_sim, transition) %>% 
+	 	  mutate(Nchanges = length(!is.na(IDtransition))) %>% 
+	 	  mutate(rate = Nchanges / edge.length)
+
+	 rates_list[[Nsimulation]] <- current_simulation_rates
+	  
+	 object <-list(segments=segs, 
+	               nchanges=nchanges, 
+	               edge.length=edge.length[-1], 
+	               tree=tree)
+	 
+	class(object)<-"ctt"
+	object_list[[Nsimulation]] <- object 
+	  
+} # 1st level closing
+
+toc()  # 1218.6 sec elapsed = 20.3 min
+
+class(object_list) <-"multiCtt"
+
+save.image("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RData/rates_ws.RData")
+```
+
+# Post-processing of data
+
+***To do:***
+
+Currently, if there was no transition of a specific type at a specific time, there is no indication of a rate. However, the rate should be zero if there was no transition. In the following code I try to replicate each time segment twice and add transitions for both types with rates == 0.\
+I'm not done with this yet.
+
+```{r}
+load("../output/RData/rates_ws.RData")
+
+rates_df <- plyr::rbind.fill(rates_list)
+summary(rates_df)
+
+# Your data manipulation code
+rates_df <- rates_df %>%
+  group_by(N_sim, segsID, transition) %>%
+  mutate(rate = ifelse(is.na(transition), 0, rate),
+         Nchanges = ifelse(is.na(transition), 0, Nchanges),
+         segs_mean = (segs_end+ segs_start)/2) %>% # Adjust the threshold (1e-6) as needed
+  mutate(avg_time = ifelse(Nchanges == 1, time, mean(time))) %>% 
+  mutate(avg_time = ifelse(is.na(avg_time), segs_mean, avg_time)) %>%
+  arrange(segsID) %>% unique()
+
+
+
+
+
+
+# Replace NAs in Transition types to set the rates to 0 where no transition occurred:
+rates_df_copy <- rates_df
+
+# Replace "NA" with the first transition type
+rates_df_copy$transition[is.na(rates_df_copy$transition)] <- unique(rates_df_copy$transition)[[2]]
+
+# Create a second copy of the data frame with "NA" transitions
+rates_df_copy2 <- rates_df
+
+# Replace "NA" with the second transition type
+rates_df_copy2$transition[is.na(rates_df_copy2$transition)] <- unique(rates_df_copy2$transition)[[3]]
+
+# Combine the two copies to get the final data frame with replicates
+final_df <- bind_rows(rates_df_copy, rates_df_copy2)
+
+
+########## ====================================================================================== ####
+# Specify the transition type for which you want to ensure rates
+specific_transition_type <- unique(rates_df_copy$transition)[[2]]
+
+# Generate a data frame with all possible combinations of segsID and the specific transition type
+all_combinations <- expand_grid(
+  segsID = unique(final_df$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df1 <- all_combinations %>%
+  left_join(final_df, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))# Generate a data frame with all possible combinations of segsID and the specific transition type
+all_combinations <- expand_grid(
+  segsID = unique(final_df1$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df1 <- all_combinations %>%
+  left_join(final_df1, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))
+########## ====================================================================================== ####
+# Specify the transition type for which you want to ensure rates
+specific_transition_type <- unique(rates_df_copy$transition)[[1]]
+
+# Generate a data frame with all possible combinations of segsID and the specific transition type
+all_combinations2 <- expand_grid(
+  segsID = unique(final_df$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df2 <- all_combinations2 %>%
+  left_join(final_df, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))# Generate a data frame with all possible combinations of segsID and the specific transition type
+
+all_combinations2 <- expand_grid(
+  segsID = unique(final_df2$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df2 <- all_combinations2 %>%
+  left_join(final_df2, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))
+########## ====================================================================================== ####
+
+
+
+# Sort the data frame if needed
+final_df <- final_df %>% arrange(segsID)  # You can specify the sorting order
+
+# Now final_df contains rows with "NA" in the "transition" column replaced by two different transition types.
+
+
+
+
+
+
+
+# Your ggplot code
+ggplot(final_df, aes(y = rate, x = segs_end, col = factor(transition), group = factor(transition))) +
+  #geom_point() +
+  geom_line() +
+  ylim(0, 0.015)+
+  theme_light()+
+  scale_color_viridis(discrete=T)
+
+
+
+ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
+  geom_col(position = "identity")+
+  ylim(0, 0.015)+
+  theme_light()+
+  scale_fill_viridis(discrete=T, alpha = 0.4)
+
+
 
 ```
 
-# From Pollination study
+# -- Plot.ctt function --
 
 ```{r}
-###### Script from Pollination study: https://github.com/rubysaltbush/pollination-macroevolution/
+plot.ctt<-function(x,...){
+  h<-max(nodeHeights(x$tree))
+  args<-list(...)
+  if(!is.null(args$type)){ 
+    type<-args$type
+    args$type<-NULL
+  } else type<-"rate"
+  if(!is.null(args$show.tree)){
+    show.tree<-args$show.tree
+    args$show.tree<-NULL
+  } else show.tree<-FALSE
+  if(!is.null(args$add)){ 
+    add<-args$add
+    args$add<-NULL
+  } else add<-FALSE
+  if(is.null(args$ylim)) 
+    args$ylim<-if(type=="number")c(0,max(x$nchanges)) else 
+      c(0,max(x$nchanges/x$edge.length))
+  if(is.null(args$xlim))
+    args$xlim<-c(max(x$segments),min(x$segments))
+  if(is.null(args$lwd)) args$lwd<-2
+  if(is.null(args$xlab)) args$xlab<-"time since the present"
+  if(is.null(args$ylab)) 
+    args$ylab<-if(type=="number") "mean number of changes" else
+      "mean number of changes / total edge length"
+  args$type<-"l"
+  args$x<-h-as.vector(t(x$segments))
+  args$y<-if(type=="number") rbind(x$nchanges,x$nchanges) else 
+    rbind(x$nchanges/x$edge.length,x$nchanges/x$edge.length)
+  if(!add) do.call(plot,args)
+  else do.call(lines,args)
+  if(show.tree) plotTree(x$tree,add=TRUE,ftype="off",lwd=1,
+                         color=make.transparent("blue",0.1),mar=par()$mar,
+                         direction="leftwards",xlim=args$xlim)
+}
 
 
-# this function comes from https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/functions/transition_times.R
+plot.ctt(object, type="rate")
 
+length(object$nchanges)
+length(object$edge.length)
+```
+
+# Plot the rate
+
+```{r}
+
+###############################################################################################################
+
+
+rates_df %>% 
+  ungroup() %>%
+  
+  ggplot(aes(x = time , y = rate, col = as.factor(transition))) +
+  #geom_point()+
+  geom_line(lwd = 5)+
+  #geom_smooth(method = "lm", formula = rate~time)+
+  scale_color_viridis(discrete=T, alpha = 0.6)+
+  scale_y_log10()+
+  theme_light()
+
+
+changes_table %>% 
+  ungroup() %>%
+  ggplot(aes(x = time , y = rate, fill = as.factor(transition))) +
+  geom_bar()+
+  scale_fill_viridis(discrete=T, alpha = 0.6)+
+  theme_light()
+```
+
+# Plot the rate 2
+
+```{r}
+library(ggplot2)
+library(viridis)
+rates_df %>% ungroup() %>% group_by(N_sim, transition) %>% 
+  ggplot(aes(x = segs_end , y = rate, group = as.factor(transition), col = as.factor(transition))) +
+  geom_point()+
+  geom_line()+
+  scale_color_viridis(discrete=T, alpha = 0.6)
+
+
+## Plots from pollination study:
+
+arm_to_no_arm <- rates_df %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::mutate(arm_to_no_arm = avg_time) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(arm_to_no_arm)
+
+no_arm_to_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::mutate(no_arm_to_arm = avg_time) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(no_arm_to_arm)
+
+# calculate density curve
+density_a2na <- density(arm_to_no_arm$arm_to_no_arm)
+density_na2a <- density(no_arm_to_arm$no_arm_to_arm)
+
+# plot the density
+plot(density_a2na, lwd = 2, col = myColours[1], 
+     xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
+     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
+lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
+```
+
+# My adaptation of Pollination study code
+
+Based on: Ref\[0\]: [Pollination-Macroevolution Study](https://github.com/rubysaltbush/pollination-macroevolution/), which was based on Ref\[1\]: Liam Revell's [Blog Post](http://blog.phytools.org/2015/08/getting-timing-of-trait-changes-from.html).
+
+Transition_times function comes from script Ref\[2\]: [transition_times.R](https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/functions/transition_times.R)
+
+Code below function comes from script Ref\[3\]: [Simmap.R](https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R)
+
+```{r}
+#| label: Modified Fig4 Pollination Study
+
+## Ref[1], Ref[0] -> Ref[2]
 transition_times <- function(simmap){
   # below adapted from Liam Revells' phytools blog 
   # http://blog.phytools.org/2015/08/getting-timing-of-trait-changes-from.html
@@ -260,9 +784,14 @@ transition_times <- function(simmap){
   output
 }
 
-## below adapted from other script:  https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R
+# End of function ====================================================================================== #
 
-# apply function across list of multiple simulations
+# Ref[0] -> Ref[3]
+
+mtrees <- readRDS("../output/RDS/mtrees_multiSimmap.rds")
+
+# apply function across list of multiple simulations:
+
 armature_transitions <- data.frame()
 for(i in 1:length(mtrees)){
   temp <- cbind(i, transition_times(mtrees[[i]]))
@@ -384,10 +913,10 @@ rug(jitter(arm_to_no_arm$arm_to_no_arm), col = my_cols[2])
 dev.off()
 ##################
 
-pdf("Fig4Pollination/RatesPlot.pdf", height = 8, width = 10)
+pdf("../output/Figs/RatesPlot.pdf", height = 8, width = 10)
 par(mar = c(5.1, 5.1, 4.1, 2.1))    # increase margins
 
-arm_to_no_arm <- armature_trans_cumul %>%
+arm_to_no_arm <- changes_table %>%
   dplyr::filter(transition == "armature->no_armature")
 
 # first set up basic plot parameters
@@ -395,7 +924,7 @@ plot(arm_to_no_arm$trans_no ~ arm_to_no_arm$time,
      type = "p", bty = "l", xlim = c(100,0), ylim = c(0,60),
      col = my_cols[1], pch = 15,
      xlab = "Time of transitions (mya)", 
-     ylab = "Cumulative number of transitions",
+     ylab = "number of transitions",
      cex.lab = 1.8, cex.axis = 1.8)
 
 # then loop through all data and add all points and lines to plot for 1000 simulations
@@ -445,409 +974,437 @@ legend("topleft",
        col = c(my_cols[1],my_cols[2]),
        pch = c(15, 17), pt.lwd = 0.001, bty = "n", cex = 1.8)
 dev.off()
-
 ```
 
-# My Data
+# My adaptation of pollination study
 
 ```{r}
-# Read in the data and tree ============================
-rm(list=ls())
-
-library(phytools) # for phylo stuff
-library(dplyr) # for data handling
-library(evobiR) # To reorder data based on tree
-library(geiger) # for Mk Models
-library(tictoc) # for time measurements of computations
-
-traitData <- read.csv("../input/Matrix_all_traits.csv", stringsAsFactors = FALSE, header = TRUE)
-tree <- read.tree("../input/Mimo_metachronogram_mmc.tre")
-tree <- as.phylo(tree)
-new_tip_names<-read.csv("../input/replace_tip_labels.csv")
-
-# Subset data by trait 
-armature <- traitData %>% select(Taxon, Armatures) %>% filter(!is.na(Taxon) & !is.na(Armatures)) %>% distinct(.) # 2 species were duplicated (Acacia baileyana and Chidlowiana sanguinea)
-
-# Correct tip names in the tree with new labels
-tree2 <- tree
-tree2$tip.label <- new_tip_names[[2]][match(tree$tip.label, new_tip_names[[1]])]
+## below adapted from other script:  https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R
 
 
-# Small subset with 10 species:
-
-#armature <- armature[1:10,]
+armature_transitions <- rates_df
 
 
-# match data and tree ===================================
-row.names(armature) <- armature$Taxon
-sp_drop <- setdiff(tree2$tip.label, armature$Taxon)
+# build new data frame with cumulative number of transitions
+armature_trans_cumul <- data.frame()
+for(n in 1:100){
+  trans <- armature_transitions %>% ungroup() %>%
+    dplyr::filter(N_sim == n) %>%
+    dplyr::group_by(transition) %>%
+    dplyr::mutate(trans_no = row_number(N_sim))
+  
+  armature_trans_cumul <- rbind(armature_trans_cumul, trans)
+}
+rm(n, trans)
 
-# Drop these species from the tree, because we need matching data between tree and traits
-tree3 <- drop.tip(tree2, sp_drop)
-tree4 <- ladderize(tree3)
 
-matches <- match(armature$Taxon, tree4$tip.label, nomatch = 0)
-armature2 <- subset(armature, matches != 0)
 
-setdiff(tree4$tip.label, armature2$Taxon) # 0
-setdiff(armature2$Taxon, tree4$tip.label) # 0
 
-tree <- tree4
+# =========================================================================================================== #
+#  Now we are summarizing over the 100 simulations:
+# =========================================================================================================== #
+##### copied from somewhere else in the code from the same script....:
 
-# Make data for Mk models for Armature
 
-armature2[armature2=="0"] <- "no_armature"
-armature2[armature2=="1"] <- "armature"
+# first need to know average number of transitions and across simulations, rounded. 
+trans_avg_length <- armature_trans_cumul %>%
+  dplyr::group_by(transition, N_sim) %>%
+  dplyr::mutate(no_trans = max(trans_no)) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(trans_no == no_trans) %>%
+  dplyr::group_by(transition) %>%
+  dplyr::mutate(avg_length = round(mean(no_trans), digits = 0)) %>%
+  dplyr::select(transition, avg_length) %>%
+  dplyr::ungroup() %>%
+  dplyr::distinct()
 
-trait <- unique(armature2)
-trait <- ReorderData(tree, trait, taxa.names = "row names")
+# now knowing this, can rearrange data and average times and edge.lengths across rows
+avg_trans_times <- armature_trans_cumul %>%
+  dplyr::group_by(transition, trans_no) %>%
+  dplyr::mutate(avg_time = mean(time)) %>%
+  dplyr::mutate(SE_time = sqrt(var(time) / length(time)),
+                avg_edge.length = mean(edge.length)) %>% ungroup() %>%
+  group_by(N_sim, segsID, transition) %>%
+  mutate(avg_Nchanges = mean(Nchanges)) %>%
+  dplyr::select(transition, trans_no, avg_time, SE_time, avg_edge.length, avg_Nchanges) %>%
+  dplyr::distinct()
 
-trait$Armatures <- as.factor(trait$Armatures)
-trait$Taxon <- NULL
+# reduce avg_trans_times to trans_avg_length
+avg_trans_times_a2na <- avg_trans_times %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::filter(trans_no <= trans_avg_length[1,2])
+avg_trans_times_na2a <- avg_trans_times %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::filter(trans_no <= trans_avg_length[2,2])
+avg_trans_times <- rbind(avg_trans_times_a2na, avg_trans_times_na2a)
+rm(avg_trans_times_a2na, avg_trans_times_na2a)
 
-# Clean environment to free memory:
-rm(tree2, tree3, tree4, traitData, new_tip_names, armature, matches, sp_drop)
+# export these results to csv in case I need them
+readr::write_csv(avg_trans_times, "../output/CSV/mean_transition_times_armature_MCC.csv")
 
-# Mk models ============================
-# estimate the rates of transitioning between ancestral states given a hypothesis (either equal rates(ER), or different rates(ARD))
 
-# computing time = 11.58s
-tic()
-  equal <- fitDiscrete(tree, trait, model = "ER")
-toc()
 
-# computing time = 42.85s
-tic()
-  ard <- fitDiscrete(tree, trait, model = "ARD")
-toc()
+#### Plotting ======================================
 
-# Calculate AIC weights
-aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
-weights <- aicw(aic.discrete)
-weights # ARD model performs better for armature/no armature
+# install.packages("prettyGraphs") #to set transparancy of colors with "alpha"
+library(prettyGraphs)
 
-# we need a slightly different format for Simmap:
-trait2 <- as.factor(trait$Armatures)
-names(trait2) <- rownames(trait)
+myColours = c("steelblue", "#FFBB00")
+myColoursAlpha <- add.alpha(myColours, alpha=0.4)
+my_cols <- setNames(myColoursAlpha, c("armature->no_armature", "no_armature->armature"))
 
-# For 100 simulation (nsim=100) --> computing time = 725.28s && 373.7 sec elapsed
-tic()
-  mtrees <- make.simmap(tree, trait2, model = "ARD", nsim = 100)
-toc()
+pdf("../output/Figs/armature_transition_times_mean_hist.pdf", height = 2.8, width = 6)
+min <- min(avg_trans_times$avg_time)
+max <- max(avg_trans_times$avg_time)
+ax <- pretty(min:50, n = 20)
 
-saveRDS(mtrees, "../output/RDS/mtrees_multiSimmap.rds")
+arm_to_no_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::mutate(arm_to_no_arm = avg_time) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(arm_to_no_arm)
 
-# 6.35s
-tic()
-  pd_mtrees <- describe.simmap(mtrees, plot = FALSE)
-toc()
-```
+no_arm_to_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::mutate(no_arm_to_arm = avg_time) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(no_arm_to_arm)
 
-My adaptation
+a2na <- hist(arm_to_no_arm$arm_to_no_arm, breaks = ax, plot = FALSE)
+na2a <- hist(no_arm_to_arm$no_arm_to_arm, breaks = ax, plot = FALSE)
 
-```{r}
+plot (a2na, col = myColours[1], xlab = "Time of transitions (mya)",  
+      main = "", ylab = "number of transitions", 
+      ylim = c(0, 30), xlim = c(50,0)) # alter if x values change!
+plot (na2a, col = my_cols[2], add = TRUE)
 
-transition_times <- function(simmap){
-  # below adapted from Liam Revells' phytools blog 
-  # http://blog.phytools.org/2015/08/getting-timing-of-trait-changes-from.html
-  # extracts raw transition times from a simmap (collapses multiple transitions
-  # down into single transition events)
-  # get tips and their states
+
+# data for density graph
+arm_to_no_arm <- armature_transitions %>% ungroup() %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::mutate(arm_to_no_arm = time,
+                rate_arm_to_no_arm = rate) %>%
+  dplyr::select(arm_to_no_arm, rate_arm_to_no_arm, simulation = N_sim)
+no_arm_to_arm <- armature_transitions %>% ungroup() %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::mutate(no_arm_to_arm = time,
+                rate_no_arm_to_arm = rate) %>%
+  dplyr::select(no_arm_to_arm, rate_no_arm_to_arm, simulation = N_sim)
+
+# Plot density of transitions ==================================================================== #
+# calculate density curve
+density_a2na <- density(arm_to_no_arm$arm_to_no_arm)
+density_na2a <- density(no_arm_to_arm$no_arm_to_arm)
+
+# plot the density
+plot(density_a2na, lwd = 2, col = myColours[1], 
+     xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
+     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
+lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
+dev.off()
+
+# Plot density of rate: ========================================================================== #
+# # calculate density curve
+# density_a2na_rate <- density(arm_to_no_arm$rate_arm_to_no_arm)
+# density_na2a_rate <- density(no_arm_to_arm$rate_no_arm_to_arm)
+# 
+# plot(density_a2na_rate, lwd = 2, col = myColours[1], 
+#      xlim = c(0,0.15), xlab = "Relative Transitions", bty = "l", ylim=c(0, 170),
+#      cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
+# lines(density_na2a_rate, lwd = 2, col = myColours[2], xlim = c(0,0.15))
+# 
+# # add data-points with noise in the X-axis
+# rug(jitter(no_arm_to_arm$rate_no_arm_to_arm), col = my_cols[1])
+# rug(jitter(arm_to_no_arm$rate_arm_to_no_arm), col = my_cols[2])
+
+
+##################
+
+pdf("../output/Figs/RatesPlot.pdf", height = 8, width = 10)
+par(mar = c(5.1, 5.1, 4.1, 2.1))    # increase margins
+
+arm_to_no_arm <- armature_trans_cumul %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  mutate(rate_arm_to_no_arm = rate)
+
+# first set up basic plot parameters
+plot(arm_to_no_arm$rate_arm_to_no_arm ~ arm_to_no_arm$time,
+     type = "p", bty = "l", 
+     xlim = c(50,0), ylim = c(0,1),
+     col = my_cols[1], pch = 15,
+     xlab = "Time of transitions (mya)", 
+     ylab = "Cumulative number of transitions",
+     cex.lab = 1.8, cex.axis = 1.8)
+
+# then loop through all data and add all points and lines to plot for 1000 simulations
+for(n in 1:100){
+  
+  no_arm_to_arm <- armature_transitions %>%
+    dplyr::filter(transition == "no_armature->armature") 
+    
+  arm_to_no_arm <- armature_transitions %>%
+    dplyr::filter(transition == "armature->no_armature") 
   
   
-  
-  x <- phytools::getStates(simmap,"tips")
-  levs<-sort(unique(c(getStates(tree,"tips"),
-                      getStates(tree,"nodes"))))
-
-  
-  # get unique states
-
-  # get length of states
-  m <- length(levs)
-  # below makes a little matrix describing transitions
-  ct <- sapply(levs, 
-               function(x,y) sapply(y, function(y,x) paste(x,"->", y, sep=""), 
-                                    x = x), y = levs)
-
-
-  
-  
-  
-  
-  # 
-  H <- phytools::nodeHeights(ct)
-  h<-c(0,max(H)-branching.times(ct),min(sapply(1:Ntip(ct),
-                                               nodeheight,tree=ct)))
-  ss<-setNames(as.factor(names(ct$edge.length)),
-               ct$edge[,2])
-  lineages<-matrix(0,length(h),length(levs),
-                   dimnames=list(names(h),levs))
-  lineages[1,getStates(tree,"nodes")[1]]<-1
-  for(i in 2:length(h)){
-    ii<-intersect(which(h[i]>H[,1]),which(h[i]<=H[,2]))
-    lineages[i,]<-summary(ss[ii])
-  }
-  
-
-  ii<-order(h)
-  times<-h[ii]
-  
-
-  lineages<-lineages[ii,]
-  lineages<-cbind(lineages,total=rowSums(lineages))
-  obj<-list(ltt=lineages,times=times,tree=tree)
-  }
-
-```
-
-# My adaptation (in loop, save to list)
-
-```{r}
-tic()
-rm(list=ls())
-mtrees <- readRDS("../output/RDS/mtrees_multiSimmap.rds")
-
-### Required function ========================================================================== #
-getChanges<-function(tree){
-  states<-sort(unique(getStates(tree)))
-  nc<-sapply(tree$maps,length)-1
-  b<-which(nc>0)
-  nc<-nc[b]
-  xx<-vector()
-  H<-nodeHeights(tree)
-  for(i in 1:length(b)){
-    for(j in 1:nc[i]){
-      ss<-names(tree$maps[[b[i]]])[j+1]
-      x<-rep(H[b[i],1]+cumsum(tree$maps[[b[i]]])[j],2)
-      xx<-c(xx,setNames(x[1],
-                        paste(names(tree$maps[[b[i]]])[j:(j+1)],
-                              collapse="->")))
-    }
-  }
-  xx
+  points(arm_to_no_arm$rate ~ arm_to_no_arm$time, 
+         col = my_cols[1], pch = 15)
+  lines(arm_to_no_arm$rate ~ arm_to_no_arm$time, 
+        col = my_cols[1])
+  points(no_arm_to_arm$rate ~ no_arm_to_arm$time, 
+         col = my_cols[2], pch = 17)
+  lines(no_arm_to_arm$rate ~ no_arm_to_arm$time, 
+        col =my_cols[2])
 }
 
-plot.ctt<-function(x,...){
-  h<-max(nodeHeights(x$tree))
-  args<-list(...)
-  if(!is.null(args$type)){ 
-    type<-args$type
-    args$type<-NULL
-  } else type<-"rate"
-  if(!is.null(args$show.tree)){
-    show.tree<-args$show.tree
-    args$show.tree<-NULL
-  } else show.tree<-FALSE
-  if(!is.null(args$add)){ 
-    add<-args$add
-    args$add<-NULL
-  } else add<-FALSE
-  if(is.null(args$ylim)) 
-    args$ylim<-c(0,max(x$nchanges/x$edge.length))
-  if(is.null(args$xlim))
-    args$xlim<-c(max(x$segments),min(x$segments))
-  if(is.null(args$lwd)) args$lwd<-2
-  if(is.null(args$xlab)) args$xlab<-"time since the present"
-  if(is.null(args$ylab)) 
-    args$ylab<- "mean number of changes / total edge length"
-  args$type<-"l"
-  args$x<-h-as.vector(t(x$segments))
-  args$y<-rbind(x$nchanges/x$edge.length,x$nchanges/x$edge.length)
-  if(!add) do.call(plot,args)
-  else do.call(lines,args)
-  if(show.tree) plotTree(x$tree,add=TRUE,ftype="off",lwd=1,
-                         color=make.transparent("blue",0.1),mar=par()$mar,
-                         direction="leftwards",xlim=args$xlim)
-}
+# then add average points and line in blue
+# first prep data
+no_arm_to_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::filter(trans_no <= trans_avg_length[1,2])
+arm_to_no_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::filter(trans_no <= trans_avg_length[2,2])
 
+# then add to plot
+points(arm_to_no_arm$trans_no/arm_to_no_arm$avg_edge.length ~ arm_to_no_arm$avg_time,
+       col = "blue", pch = 15)
+lines(arm_to_no_arm$trans_no/arm_to_no_arm$avg_edge.length ~ arm_to_no_arm$avg_time, 
+      col = "blue")
+points(no_arm_to_arm$trans_no/no_arm_to_arm$avg_edge.length ~ no_arm_to_arm$avg_time,
+       col = "darkblue", pch = 17)
+lines(no_arm_to_arm$trans_no/no_arm_to_arm$avg_edge.length ~ no_arm_to_arm$avg_time, 
+      col = "darkblue")
 
-
-# ============================================================================================= #
-# Create a function to find the segment ID for a given time value:
-# ============================================================================================= #
-find_segment_id <- function(time) {
-  segment_indices <- cut(time, breaks = segs_df[, 2], labels = FALSE)
-  return(segs_df$segsID[segment_indices])
-  }
-## ============================================================================================= #
-
-
-# ====================================================================================================== #
-## Step 2: Loop over each simulation and extract 
-# - breaks for segments
-# - edge.lengths
-# - rates for each character state transition
-# ====================================================================================================== #
-
-
-object_list <- list()
-rates_list <- list()
-
-# First Level of the loop  
-for (Nsimulation in 1:100){ 
-  
-  b<-20    # set the number of time-segments for which everything will be calculated.
-   
-  tree <- as.phylo(mtrees[[Nsimulation]])
- 
-  h<-max(nodeHeights(tree))
-  segs<-cbind(seq(0,h-h/b,h/b),
-              seq(1/b*h,h,h/b))
-
-  
-  
-  changes<-sapply(mtrees, getChanges) 
-
-  nchanges<-rep(0,b)
-  for(i in 1:length(changes)){
-  
-    for(j in 1:length(changes[[i]])){
-    
-      ind<-which((changes[[i]][j]>segs[,1])+ 
-                   (changes[[i]][j]<=segs[,2])==2)
-      nchanges[ind]<-nchanges[ind]+1/length(changes)
-      
-      } # closing of 2nd level
-    
-    } # closing of 1st level
-
-  rm(i,j)  
-  
-
-  changes_table <- data.frame(transitions = rownames(t(do.call(rbind,changes))),
-                             t(do.call(rbind,changes)), 
-                             row.names = NULL)
-
-  ## Edge.Lengths =========================================================================== #
-  
-  ## For one tree
-  tic("ltt function")
-  LTT<-ltt(tree,plot=FALSE)
-	toc() #24.5 seconds
-	
-  LTT<-cbind(LTT$ltt[2:(length(LTT$ltt)-1)],
-	LTT$times[2:(length(LTT$ltt)-1)],
-  LTT$times[3:length(LTT$ltt)])
-  
-	ii<-1
-
-	# Create an empty vector to store edge lengths
-	edge.length <- rep(0, nrow(segs))
-
-	
-	# 2nd level loop: 
-	# (for one tree because LTT is calculated for one tree)
-   for (i_segs in 1:nrow(segs)) {
-     
-
-     # Find the indices of LTT segments that overlap with the current segs segment
-     overlap_indices <- which(LTT[, 2] <= segs[i_segs, 2] & LTT[, 3] >= segs[i_segs, 1])
-  
-
-     # Calculate edge length for the current segs segment using vectorized operations
-     # 3rd level loop: 
-     for (ii in overlap_indices) {
-     
-       # edge.length should contain the edge lengths for all segments:  
-       edge.length[i_segs] <- edge.length[i_segs] +        
-         LTT[ii, 1] * 
-         (min(segs[i_segs, 2], LTT[ii, 3]) - 
-            max(segs[i_segs, 1], LTT[ii, 2])) 
-
-     
-       } # 3rd level closing
-     
-   } # 2nd level closing
-     
-	
-	edge.length_backup <- edge.length
-	edge.length <-c(1, edge.length)
-
-  # edge.length should contain the edge lengths for all segments in a given simulation
- 	# adding segsID coulmn to edge lengths
-	 	edge.length_df <- data.frame(edge.length = edge.length, segsID = seq(1,b+1))
-     
-     	  
-# ============================================================================================= #
-# Create a dataframe with transitions, times, edge.lengths, segment IDs.
-# ============================================================================================= #
-	  ## first level loop: along simulations
-	  
-	 	# Again extract changes for each simulation separately:
-	  current_simulation <- as.data.frame(changes[[Nsimulation]], 
-	                                      row.names = names(changes[[Nsimulation]]))
-	  names(current_simulation) <- c("time")
-	  current_simulation$transition <- rownames(current_simulation)
-	 	current_simulation$N_sim <- Nsimulation
-	 	current_simulation$IDtransition <- seq(1:nrow(current_simulation))
-
-	 	
-	 	# ============================================================================================= #
-	 	# Working the segments: 
-	 	# ============================================================================================= #
-
-	 	
-	 	# Create a vector of segment IDs
-	 	segs_df <- as.data.frame(segs)
-	 	new_row <- data.frame(V1 = 0, V2 = 0)
-	 	segs_df <- rbind(new_row, segs_df)
-	 	segs_df$segsID <- seq(1,b+1) # now we can calculate the breaks from it
-
-
-	 	
-	 	# Use the apply function to find the segment ID for each row in current_simulation
-
-	 	current_simulation$segsID <- apply(current_simulation, 1, function(row) {
-  
-	 	  time <- as.numeric(row["time"])
-	 	  return(find_segment_id(time))
-
-	 	  }) # closing loop from within the apply-function (3rd level loop closing)
-
-	 
-	 	
-	 	# assign here edge.length based on segment ID
-	 	current_simulation <- unique(merge(current_simulation, edge.length_df, by="segsID", all = T))
-	 	names(segs_df) <- c("segs_start", "segs_end", "segsID")
-	  current_simulation <-	unique(merge(current_simulation, segs_df, by = "segsID", all = T))
-	 	# Calculate rate for each simulation:
-	 	
-	 	current_simulation_rates <- current_simulation %>% 
-	 	  group_by(segsID, N_sim, transition) %>% 
-	 	  mutate(Nchanges = sum(!is.na(IDtransition))) %>% 
-	 	  mutate(rate = Nchanges / edge.length)
-
-	 	
-	 	
-	  rates_list[[Nsimulation]] <- current_simulation_rates
-	  
-	  object <-list(segments=segs, nchanges=nchanges, edge.length=edge.length, tree=tree, rate = nchanges/edge.length)
-	class(object)<-"ctt"
-	object
-	
-	
-	object_list[[Nsimulation]] <- object 
-	  
-} # 1st level closing
-toc()  # 1218.6 sec elapsed = 20.3 min
-plot.ctt(object, type = "rate")
-rates_df <- do.call(rbind, rates_list)
-
-# save.image("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RData/rates_ws.RData")
-
+# add legend
+legend("topleft",
+       legend = c("armature->no_armature", "no_armature->armature"),
+       col = c(my_cols[1],my_cols[2]),
+       pch = c(15, 17), pt.lwd = 0.001, bty = "n", cex = 1.8)
+dev.off()
 
 ```
+
+## same thing in ggplot2 (rates plot)
 
 ```{r}
 library(ggplot2)
-library(viridis)
-rates_df %>% ungroup() %>% group_by(N_sim, transition) %>% 
-  ggplot(aes(x = segs_end , y = rate, group = as.factor(transition), col = as.factor(transition))) +
-  geom_point()+
-  geom_line()+
-  scale_color_viridis(discrete=T, alpha = 0.6)
+
+
+plot.ctt(object, type="rate")
+
+no_arm_to_arm <- armature_transitions %>%
+      filter(transition == "no_armature->armature")
+    
+arm_to_no_arm <- armature_transitions %>%
+      filter(transition == "armature->no_armature")
+    
+ggplot() + 
+      # Armature -> No Armature:
+      geom_point(data = arm_to_no_arm, aes(x = time, y = rate, colour = "Armature -> no Armature"), pch = 15) +
+      geom_line(data = arm_to_no_arm, aes(x = time, y = rate, colour = "Armature -> no Armature")) +
+      
+      # No Armature -> Armature:
+      geom_point(data = no_arm_to_arm, aes(x = time, y = rate, colour = "No Armature -> Armature"), pch = 17) +
+      geom_line(data = no_arm_to_arm, aes(x = time, y = rate, colour = "No Armature -> Armature")) +
+      
+    geom_point(data = avg_trans_times %>% filter(transition == "armature->no_armature"), 
+               aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "Armature -> no Armature"), 
+               pch = 15) +
+  
+    geom_line(data = avg_trans_times %>% filter(transition == "armature->no_armature"),
+            aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "Armature -> no Armature")) +
+  
+  
+    geom_point(data = avg_trans_times %>% filter(transition == "no_armature->armature"),
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "No Armature -> Armature"), 
+             pch = 17) +
+  
+    geom_line(data = avg_trans_times %>% filter(transition == "no_armature->armature"),
+            aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "No Armature -> Armature")) +
+  
+  
+    # Set plot aesthetics
+    scale_color_viridis(discrete=T, alpha = 0.7)+
+    theme_light() + 
+    xlim(45, 0) +
+    ylim(0, 0.4) +
+    labs(
+      x = "Time since the origin of clade (mya)",
+      y = "relative changes per edge.length")
+
 ```
 
-\
-\
+# Another try of rates plot
+
+```{r}
+# Rates Plot in ggplot2
+library(ggplot2)
+library(viridis)
+
+# several layers:
+## 1. cumulative rates (?) grouped by transitions
+## 2. each rate from each simulation grouped by transition
+
+
+
+pdf("../output/Figs/RatesPlot.pdf", height = 8, width = 10)
+par(mar = c(5.1, 5.1, 4.1, 2.1))    # increase margins
+
+
+
+
+
+
+arm_to_no_arm <- armature_trans_cumul %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  mutate(rate_arm_to_no_arm = rate)
+
+
+
+ggplot(armature_trans_cumul, aes(x = time, y = rate, group = transition, color = transition)) +
+  geom_point(aes(shape = transition), size = 3) +  # Add points
+  geom_line(size = 1) +  # Add connecting lines
+  scale_x_reverse() +  # Reverse the x-axis
+  scale_y_continuous(limits = c(0, 1)) +  # Set y-axis limits
+  labs(
+    x = "Time of transitions (mya)",
+    y = "Cumulative number of transitions",
+    color = "Transition",
+    shape = "Transition"
+  ) +
+  theme_minimal()
+
+
+
+
+
+
+
+# first set up basic plot parameters
+plot(arm_to_no_arm$rate ~ arm_to_no_arm$time,
+     type = "p", bty = "l", 
+     xlim = c(50,0), ylim = c(0,1),
+     col = my_cols[1], pch = 15,
+     xlab = "Time of transitions (mya)", 
+     ylab = "Cumulative number of transitions",
+     cex.lab = 1.8, cex.axis = 1.8)
+
+# then loop through all data and add all points and lines to plot for 1000 simulations
+for(n in 1:100){
+  
+  no_arm_to_arm <- armature_transitions %>%
+    dplyr::filter(transition == "no_armature->armature") 
+    
+  arm_to_no_arm <- armature_transitions %>%
+    dplyr::filter(transition == "armature->no_armature") 
+  
+  
+  points(arm_to_no_arm$rate ~ arm_to_no_arm$time, 
+         col = my_cols[1], pch = 15)
+  lines(arm_to_no_arm$rate ~ arm_to_no_arm$time, 
+        col = my_cols[1])
+  points(no_arm_to_arm$rate ~ no_arm_to_arm$time, 
+         col = my_cols[2], pch = 17)
+  lines(no_arm_to_arm$rate ~ no_arm_to_arm$time, 
+        col =my_cols[2])
+}
+
+# then add average points and line in blue
+# first prep data
+no_arm_to_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "no_armature->armature") %>%
+  dplyr::filter(trans_no <= trans_avg_length[1,2])
+arm_to_no_arm <- avg_trans_times %>%
+  dplyr::filter(transition == "armature->no_armature") %>%
+  dplyr::filter(trans_no <= trans_avg_length[2,2])
+
+# then add to plot
+points(arm_to_no_arm$trans_no/arm_to_no_arm$avg_edge.length ~ arm_to_no_arm$avg_time,
+       col = "blue", pch = 15)
+lines(arm_to_no_arm$trans_no/arm_to_no_arm$avg_edge.length ~ arm_to_no_arm$avg_time, 
+      col = "blue")
+points(no_arm_to_arm$trans_no/no_arm_to_arm$avg_edge.length ~ no_arm_to_arm$avg_time,
+       col = "darkblue", pch = 17)
+lines(no_arm_to_arm$trans_no/no_arm_to_arm$avg_edge.length ~ no_arm_to_arm$avg_time, 
+      col = "darkblue")
+
+# add legend
+legend("topleft",
+       legend = c("armature->no_armature", "no_armature->armature"),
+       col = c(my_cols[1],my_cols[2]),
+       pch = c(15, 17), pt.lwd = 0.001, bty = "n", cex = 1.8)
+
+
+
+```
+
+# \-- Plot.multiCtt function --
+
+```{r}
+for(i in 1:length(object_list)){
+  x <- object_list
+  if(hasArg(alpha)) alpha<-list(...)$alpha else alpha<-0.05
+  segments<-x[[1]]$segments
+  nchanges<-sapply(x,function(x) x$nchanges)
+  if(hasArg(type)) type<-list(...)$type else type<-"rate"
+  edge.length<-sapply(x,function(x) x$edge.length)
+  obj<-list(segments=segments,nchanges=rowMeans(nchanges),
+            edge.length=rowMeans(edge.length),tree=x[[1]]$tree)
+  class(obj)<-"ctt"
+  lower<-max(floor(alpha/2*length(x)),1)
+  upper<-min(ceiling((1-alpha/2)*length(x)),ncol(nchanges))
+  xx<-max(nodeHeights(x[[1]]$tree))-as.vector(t(segments))
+  xx<-c(xx,xx[length(xx):1])
+  y.lower<-if(type=="number") apply(nchanges,1,sort)[lower,] else
+    if(type=="rate") apply(nchanges/edge.length,1,sort)[lower,]
+  y.upper<-if(type=="number") apply(nchanges,1,sort)[upper,] else
+    if(type=="rate") apply(nchanges/edge.length,1,sort)[upper,]
+  y.lower<-as.vector(rbind(y.lower,y.lower))
+  y.upper<-as.vector(rbind(y.upper,y.upper))
+  yy<-c(y.lower,y.upper[length(y.upper):1])
+  args<-list(...)
+  if(!is.null(args$alpha)) args$alpha<-NULL
+  if(is.null(args$col)) args$col<-"blue"
+  if(is.null(args$ylim)) args$ylim<-range(yy)
+  args$x<-obj
+  do.call(plot,args)
+  polygon(xx,yy,col=make.transparent("grey",0.4),border=0)
+}
+
+
+
+
+plot.multiCtt<-function(x,...){
+  if(hasArg(alpha)) alpha<-list(...)$alpha
+  else alpha<-0.05
+  segments<-x[[1]]$segments
+  nchanges<-sapply(x,function(x) x$nchanges)
+  if(hasArg(type)) type<-list(...)$type
+  else type<-"rate"
+  edge.length<-sapply(x,function(x) x$edge.length)
+  obj<-list(segments=segments,nchanges=rowMeans(nchanges),
+            edge.length=rowMeans(edge.length),tree=x[[1]]$tree)
+  class(obj)<-"ctt"
+  lower<-max(floor(alpha/2*length(x)),1)
+  upper<-min(ceiling((1-alpha/2)*length(x)),ncol(nchanges))
+  xx<-max(nodeHeights(x[[1]]$tree))-as.vector(t(segments))
+  xx<-c(xx,xx[length(xx):1])
+  y.lower<-if(type=="number") apply(nchanges,1,sort)[lower,] else
+    if(type=="rate") apply(nchanges/edge.length,1,sort)[lower,]
+  y.upper<-if(type=="number") apply(nchanges,1,sort)[upper,] else
+    if(type=="rate") apply(nchanges/edge.length,1,sort)[upper,]
+  y.lower<-as.vector(rbind(y.lower,y.lower))
+  y.upper<-as.vector(rbind(y.upper,y.upper))
+  yy<-c(y.lower,y.upper[length(y.upper):1])
+  args<-list(...)
+  if(!is.null(args$alpha)) args$alpha<-NULL
+  if(is.null(args$col)) args$col<-"blue"
+  if(is.null(args$ylim)) args$ylim<-range(yy)
+  args$x<-obj
+  do.call(plot,args)
+  polygon(xx,yy,col=make.transparent("grey",0.4),border=0)
+}
+
+plot.multiCtt(object_list, type="rate")
+
+```

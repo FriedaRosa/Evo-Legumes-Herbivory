@@ -1,0 +1,15 @@
+"0","ggplot(armature_trans_cumul, aes(x = time, y = rate, group = transition, color = transition)) +
+  geom_point(aes(shape = transition), size = 3) +  # Add points
+  geom_line(size = 1) +  # Add connecting lines
+  scale_x_reverse() +  # Reverse the x-axis
+  scale_y_continuous(limits = c(0, 1)) +  # Set y-axis limits
+  labs(
+    x = ""Time of transitions (mya)"",
+    y = ""Cumulative number of transitions"",
+    color = ""Transition"",
+    shape = ""Transition""
+  ) +
+  theme_minimal()
+"
+"2","Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+Please use `linewidth` instead."

@@ -1,0 +1,5 @@
+[2,"\n"]
+[1,"\r\n\r\nprocessing file: Quarto_CTT_New.qmd\r\n\r  |                                          \r  |                                    |   0%\r  |                                          \r  |.                                   |   4%                                  \r  |                                          \r  |...                                 |   8% [unnamed-chunk-1]                "]
+[1,"\r  |                                          \r  |....                                |  12%                                  \r  |                                          \r  |......                              |  16% [Modified Fig4 Pollination Study]"]
+[1,"\r\nQuitting from lines 44-305 [Modified Fig4 Pollination Study] (Quarto_CTT_New.qmd)\r\nError:\r\n! object 'changes_table' not found\r\nBacktrace:\r\n 1. changes_table %>% ...\r\n 2. dplyr::filter(., transition == \"armature->no_armature\")\r\n"]
+[1,"\r                                                                                                                            \r\nExecution halted\r\n"]
