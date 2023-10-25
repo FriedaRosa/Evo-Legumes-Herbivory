@@ -14,16 +14,25 @@ The following code is a mixture of code written by **Liam Revell within the Phyt
 
 and from the code for Figure 4 in **Stephens et al., (2023):** [Paper](https://nph.onlinelibrary.wiley.com/doi/10.1111/nph.18993); [GitHub Repo](https://github.com/rubysaltbush/pollination-macroevolution)
 
-Ref \[1\]
+Ref \[1\] Liam Revell's ctt() function from phytools
 
-Ref \[2\]
+Ref \[2\] Stephens et al Guthub repo: transition_times function
 
-Ref \[3\]
+Ref \[3\] Stephens et al Guthub repo: simmap.R script
 
 # Open the required Libraries
 
 ```{r}
+#| warning = F
+#| message = F
+
 rm(list=ls())
+
+
+# Libraries:
+
+library(phangorn) # to compute MCC tree
+library(evobiR) # reorder data by tree
 
 library(phytools) # v. ‘1.9.16’ for phylo stuff
 library(dplyr) # for data handling
@@ -38,6 +47,9 @@ library(viridis)
 # My Data (Legumes) \* read back in from RDS
 
 ```{r}
+#| label: Legumes data & produce simmap
+
+
 # Read in the data and tree ============================
 
 traitData <- read.csv("../input/Matrix_all_traits.csv", stringsAsFactors = FALSE, header = TRUE)
@@ -51,12 +63,6 @@ armature <- traitData %>% select(Taxon, Armatures) %>% filter(!is.na(Taxon) & !i
 # Correct tip names in the tree with new labels
 tree2 <- tree
 tree2$tip.label <- new_tip_names[[2]][match(tree$tip.label, new_tip_names[[1]])]
-
-
-# Small subset with 10 species:
-
-#armature <- armature[1:10,]
-
 
 # match data and tree ===================================
 row.names(armature) <- armature$Taxon
@@ -115,7 +121,7 @@ tic()
   mtrees <- make.simmap(tree, trait2, model = "ARD", nsim = 100)
 toc()
 
-saveRDS(mtrees, "../output/RDS/mtrees_multiSimmap.rds")
+saveRDS(mtrees, "../output/RDS/legumes_mtrees_multiSimmap.rds")
 
 # 6.35s
 tic()
@@ -134,7 +140,7 @@ Reference: [ctt.R](https://github.com/liamrevell/phytools/blob/master/R/ctt.R) (
 ```{r}
 tic( "loop")
 rm(list=ls())
-mtrees <- readRDS("../output/RDS/mtrees_multiSimmap.rds")
+mtrees <- readRDS("../output/RDS/legumes_mtrees_multiSimmap.rds")
 
 ### Required function ========================================================================== #
 getChanges<-function(tree){
@@ -293,11 +299,11 @@ for (Nsimulation in 1:100){
   LTT <- ltt(tree,plot=FALSE)
 
 	# transform LTT data so that we can use it:
-  LTT <- cbind(LTT$ltt[2:(length(LTT$ltt)-1)],                # Number of species at each node minus the root
-               LTT$times[2:(length(LTT$ltt)-1)],              # "start" time for each node minus the root
-               LTT$times[3:length(LTT$ltt)])                  # "end" time for each node minus the root
+  LTT <- cbind(LTT$ltt[2:(length(LTT$ltt)-1)],            # Number of species at each node minus the root
+               LTT$times[2:(length(LTT$ltt)-1)],          # "start" time for each node minus the root
+               LTT$times[3:length(LTT$ltt)])              # "end" time for each node minus the root
   
-  # -------------------------------------------------------------------------------------------------------- #
+  # -------------------------------------------------------------------------------------------------#
   
   ## Now we loop through all segments to extract matching edge.lengths =================================== #
   
@@ -399,7 +405,7 @@ for (Nsimulation in 1:100){
   edge.lengths_all_df <- plyr::rbind.fill(edge.lengths_all)
   changes_table_w_edge <- merge(changes_table_wo_edge, edge.lengths_all_df, by = "time")
   # Write to file (once is enough)
-  write.csv(changes_table_w_edge, "../output/CSV/changes_table_w_edgelengths.csv")
+  write.csv(changes_table_w_edge, "../output/CSV/Legumes_changes_table_w_edgelengths.csv")
 	
 #########################################################################################################
 # END WIP 
@@ -469,10 +475,10 @@ toc()  # 1218.6 sec elapsed = 20.3 min
 
 class(object_list) <-"multiCtt"
 
-save.image("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RData/rates_ws.RData")
+save.image("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RData/Legumes_rates_ws.RData")
 ```
 
-# Post-processing of data
+# to do: Post-processing of data
 
 ***To do:***
 
@@ -480,7 +486,7 @@ Currently, if there was no transition of a specific type at a specific time, the
 I'm not done with this yet.
 
 ```{r}
-load("../output/RData/rates_ws.RData")
+load("../output/RData/Legumes_rates_ws.RData")
 
 rates_df <- plyr::rbind.fill(rates_list)
 summary(rates_df)
@@ -824,7 +830,7 @@ readr::write_csv(avg_trans_times, "../Fig4Pollination/mean_transition_times_arma
 # install.packages("prettyGraphs") #to set transparancy of colors with "alpha"
 library(prettyGraphs)
 
-myColours = c("steelblue", "#FFBB00")
+myColours = c("lightgrey", "#FFBB00")
 myColoursAlpha <- add.alpha(myColours, alpha=0.4)
 my_cols <- setNames(myColoursAlpha, c("armature->no_armature", "no_armature->armature"))
 
@@ -1017,7 +1023,7 @@ readr::write_csv(avg_trans_times, "../output/CSV/mean_transition_times_armature_
 # install.packages("prettyGraphs") #to set transparancy of colors with "alpha"
 library(prettyGraphs)
 
-myColours = c("steelblue", "#FFBB00")
+myColours = c("lightgrey", "#FFBB00")
 myColoursAlpha <- add.alpha(myColours, alpha=0.4)
 my_cols <- setNames(myColoursAlpha, c("armature->no_armature", "no_armature->armature"))
 
@@ -1210,8 +1216,7 @@ library(viridis)
 rates_df %>% ungroup() %>% group_by(N_sim, transition) %>% 
   ggplot(aes(x = segs_end , y = rate, group = as.factor(transition), col = as.factor(transition))) +
   geom_point()+
-  geom_line()+
-  scale_color_viridis(discrete=T, alpha = 0.6)
+  geom_line()
 
 
 ## Plots from pollination study:
@@ -1383,3 +1388,7 @@ plot.multiCtt<-function(x,...){
 plot.multiCtt(object_list, type="rate")
 
 ```
+
+
+
+
