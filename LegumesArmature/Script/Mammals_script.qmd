@@ -918,6 +918,13 @@ trans_avg_length <- megaherbivore_trans_cumul %>%
   dplyr::distinct()
 
 # now knowing this, can rearrange data and average times across rows
+
+
+
+# Note by Frieda: Here they make a mistake. They assume that in each simulation, the first transition (and so on) happened approximately at the same time. They number all transitions, starting with 1 being the first after the root and then averaging over time times. 
+# This produces wrong transition times as sometimes very early transitions are averaged with very late ones and there can be millions of years in between. 
+
+
 avg_trans_times <- megaherbivore_trans_cumul %>%
   dplyr::group_by(transition, trans_no) %>%
   dplyr::mutate(avg_time = mean(time)) %>%
