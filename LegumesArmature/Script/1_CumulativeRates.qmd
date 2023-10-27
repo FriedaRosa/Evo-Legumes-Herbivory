@@ -232,7 +232,7 @@ saveRDS(mtrees, "../output/RDS/Mammals_mtrees_multiSimmap.rds")
 Now we have 2 Simmap RDS objects: each with 100 simulations on the MCC tree (mtrees)
 
 
-#2. Cumulative Transition rates 
+# 2. Cumulative Transition rates 
 
 ## Adaptation of Pollination study code
 
