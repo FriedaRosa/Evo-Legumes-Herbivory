@@ -590,7 +590,7 @@ ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
   theme_light()+
   scale_fill_viridis(discrete=T, alpha = 0.4)
 ```
-
+# From Pollination study: 
 ```{r}
 
 ## below adapted from other script:  https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R
@@ -800,10 +800,11 @@ dev.off()
 
 
 ```{r}
-
 #| label: Modified Fig4 Pollination Study
-
+rm(list=ls())
 ## Ref[1], Ref[0] -> Ref[2]
+
+
 transition_times <- function(simmap) {
   # below adapted from Liam Revells' phytools blog 
   # http://blog.phytools.org/2015/08/getting-timing-of-trait-changes-from.html
@@ -875,6 +876,7 @@ transition_times <- function(simmap) {
 
 # Ref[0] -> Ref[3]
 
+
 mtrees <- readRDS("../output/RDS/Mammals_mtrees_multiSimmap.rds")
 
 # apply function across list of multiple simulations:
@@ -892,7 +894,7 @@ table(megaherbivore_transitions$transition)
 megaherbivore_trans_cumul <- data.frame()
 for(n in 1:100){
   trans <- megaherbivore_transitions %>%
-    dplyr::filter(i == n) %>%
+    dplyr::filter(i == n) %>% arrange(time) %>%
     dplyr::group_by(transition) %>%
     dplyr::mutate(trans_no = row_number(i))
   
@@ -935,22 +937,28 @@ rm(avg_trans_times_m2o, avg_trans_times_o2m)
 
 # export these results to csv in case I need them
 readr::write_csv(avg_trans_times, "../Fig4Pollination/Mammals_mean_transition_times_megaherbivore_MCC.csv")
+```
 
 
-
+```{r}
 #### Plotting ======================================
 
 # install.packages("prettyGraphs") #to set transparancy of colors with "alpha"
 library(prettyGraphs)
 
-myColours = c( "#FFBB00","lightgrey")
-myColoursAlpha <- add.alpha(myColours, alpha=0.4)
-my_cols <- setNames(myColoursAlpha, c("megaherbivore->other", "other->megaherbivore"))
+myColours = c( "lightgrey","yellow")
+myColoursAlpha <- add.alpha(myColours, alpha=0.3)
+my_cols <- setNames(myColoursAlpha, c("megaherbivore -> other", "other -> megaherbivore"))
+
+
+
+
 
 pdf("../Fig4Pollination/megaherbivore_transition_times_mean_hist.pdf", height = 2.8, width = 6)
+
 min <- min(avg_trans_times$avg_time)
 max <- max(avg_trans_times$avg_time)
-ax <- pretty(min:106, n = 20)
+ax <- pretty(min:220, n = 20)
 
 mega2other <- avg_trans_times %>%
   dplyr::filter(transition == "megaherbivore->other") %>%
@@ -964,13 +972,13 @@ other2mega <- avg_trans_times %>%
   dplyr::ungroup() %>%
   dplyr::select(other2mega)
 
-a2na <- hist(other2mega$other2mega, breaks = ax, plot = FALSE)
-na2a <- hist(mega2other$mega2other, breaks = ax, plot = FALSE)
+o2m <- hist(other2mega$other2mega, breaks = ax, plot = FALSE)
+m2o <- hist(mega2other$mega2other, breaks = ax, plot = FALSE)
 
-plot (a2na, col = myColours[1], xlab = "Time of transitions (mya)",  
+plot (o2m, col = myColours[1], xlab = "Time of transitions (mya)",  
       main = "", ylab = "number of transitions", 
-      ylim = c(0, 40), xlim = c(100,0)) # alter if x values change!
-plot (na2a, col = my_cols[2], add = TRUE)
+      ylim = c(0, 40), xlim = c(220,0)) # alter if x values change!
+plot (m2o, col = my_cols[2], add = TRUE)
 
 
 # data for density graph
@@ -984,23 +992,36 @@ other2mega <- megaherbivore_transitions %>%
   dplyr::select(other2mega, simulation = i)
 
 # calculate density curve
-density_a2na <- density(mega2other$mega2other)
-density_na2a <- density(other2mega$other2mega)
+density_m2o <- density(mega2other$mega2other)
+density_o2m <- density(other2mega$other2mega)
 
 # plot the density
-plot(density_a2na, lwd = 2, col = myColours[1], 
+plot(density_m2o, lwd = 2, col = myColours[1], 
      xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
      cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
-lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
+lines(density_o2m, lwd = 2, col = myColours[2], xlim = c(58,0))
 
 # add data-points with noise in the X-axis
 rug(jitter(mega2other$mega2other), col = my_cols[1])
 rug(jitter(other2mega$other2mega), col = my_cols[2])
 
 dev.off()
-##################
 
-pdf("../output/Figs/Mammals_RatesPlot.pdf", height = 8, width = 10)
+
+
+
+
+
+
+
+
+
+##################
+```
+
+
+```{r}
+pdf("../output/Figs/Mammals_RatesPlot.pdf", height = 10, width = 10)
 par(mar = c(5.1, 5.1, 4.1, 2.1))    # increase margins
 
 mega2other <- changes_table %>%
@@ -1008,14 +1029,15 @@ mega2other <- changes_table %>%
 
 # first set up basic plot parameters
 plot(mega2other$trans_no ~ mega2other$time,
-     type = "p", bty = "l", xlim = c(100,0), ylim = c(0,60),
+     type = "p", bty = "l", xlim = c(220,0), 
+     ylim = c(0,40),
      col = my_cols[1], pch = 15,
      xlab = "Time of transitions (mya)", 
      ylab = "number of transitions",
      cex.lab = 1.8, cex.axis = 1.8)
 
 # then loop through all data and add all points and lines to plot for 1000 simulations
-for(n in 1:1000){
+for(n in 1:100){
   test <- megaherbivore_transitions %>%
     dplyr::filter(i == n) %>%
     dplyr::group_by(transition) %>%
@@ -1027,13 +1049,13 @@ for(n in 1:1000){
     dplyr::filter(transition == "megaherbivore->other")
   
   points(mega2other$trans_no ~ mega2other$time, 
-         col = my_cols[1], pch = 15)
+         col = my_cols[1], pch = 15, xlim = c(220,0), ylim = c(0,40))
   lines(mega2other$trans_no ~ mega2other$time, 
-        col = my_cols[1])
+        col = my_cols[1],xlim = c(220,0), ylim = c(0,40))
   points(other2mega$trans_no ~ other2mega$time, 
-         col = my_cols[2], pch = 17)
+         col = my_cols[2], pch = 17,xlim = c(220,0), ylim = c(0,40))
   lines(other2mega$trans_no ~ other2mega$time, 
-        col =my_cols[2])
+        col =my_cols[2],xlim = c(220,0), ylim = c(0,40))
 }
 
 # then add average points and line in blue
@@ -1047,13 +1069,13 @@ mega2other <- avg_trans_times %>%
 
 # then add to plot
 points(mega2other$trans_no ~ mega2other$avg_time,
-       col = "blue", pch = 15)
+       col = "darkgrey", pch = 15, xlim = c(220,0), ylim = c(0,40))
 lines(mega2other$trans_no ~ mega2other$avg_time, 
-      col = "blue")
+      col = "darkgrey", lwd = 3,xlim = c(220,0), ylim = c(0,40))
 points(other2mega$trans_no ~ other2mega$avg_time,
-       col = "darkblue", pch = 17)
+       col = "#FFBB00", pch = 17,xlim = c(220,0), ylim = c(0,40))
 lines(other2mega$trans_no ~ other2mega$avg_time, 
-      col = "darkblue")
+      col = "#FFBB00", lwd = 3,xlim = c(220,0), ylim = c(0,40))
 
 # add legend
 legend("topleft",
@@ -1061,7 +1083,111 @@ legend("topleft",
        col = c(my_cols[1],my_cols[2]),
        pch = c(15, 17), pt.lwd = 0.001, bty = "n", cex = 1.8)
 dev.off()
+
 ```
+
+
+## Rates Plot New
+```{r}
+pdf("../output/Figs/Mammals_RatesPlot_split.pdf", height = 10, width = 20)
+par(mar = c(5.1, 5.1, 4.1, 2.1), mfrow = c(1,2))    # increase margins
+
+# a)
+mega2other <- changes_table %>%
+  dplyr::filter(transition == "megaherbivore->other")
+
+# first set up basic plot parameters
+plot(mega2other$trans_no ~ mega2other$time,
+     type = "p", bty = "l", xlim = c(100,0), ylim = c(0,40),
+     col = my_cols[2], pch = 15,
+     xlab = "Time of transitions (mya)", 
+     ylab = "number of transitions",
+     cex.lab = 1.8, cex.axis = 1.8)
+
+# then loop through all data and add all points and lines to plot for 1000 simulations
+for(n in 1:1000){
+  test <- megaherbivore_transitions %>%
+    dplyr::filter(i == n) %>%
+    dplyr::group_by(transition) %>%
+    dplyr::mutate(trans_no = row_number(i))
+  
+  mega2other <- test %>%
+    dplyr::filter(transition == "megaherbivore->other")
+  
+  points(mega2other$trans_no ~ mega2other$time, 
+         col = my_cols[2], pch = 15)
+  lines(mega2other$trans_no ~ mega2other$time, 
+        col = my_cols[2])
+
+}
+
+# then add average points and line in blue
+# first prep data
+
+mega2other <- avg_trans_times %>%
+  dplyr::filter(transition == "megaherbivore->other") %>%
+  dplyr::filter(trans_no <= trans_avg_length[2,2])
+
+# then add to plot
+points(mega2other$trans_no ~ mega2other$avg_time,
+       col = "darkgrey", pch = 15)
+lines(mega2other$trans_no ~ mega2other$avg_time, 
+      col = "darkgrey")
+
+
+# add legend
+legend("topleft",
+       legend = c("megaherbivore->other"),
+       col = c(my_cols[2]),
+       pch = c(15), pt.lwd = 0.001, bty = "n", cex = 1.8)
+
+
+
+par(mar = c(5.1, 5.1, 4.1, 2.1))    # increase margins
+
+other2mega <- changes_table %>%
+  dplyr::filter(transition == "other->megaherbivore")
+
+# first set up basic plot parameters
+plot(other2mega$trans_no ~ other2mega$time,
+     type = "p", bty = "l", xlim = c(100,0), ylim = c(0,40),
+     col = my_cols[1], pch = 15,
+     xlab = "Time of transitions (mya)", 
+     ylab = "number of transitions",
+     cex.lab = 1.8, cex.axis = 1.8)
+
+for(n in 1:1000){
+  test <- megaherbivore_transitions %>%
+    dplyr::filter(i == n) %>%
+    dplyr::group_by(transition) %>%
+    dplyr::mutate(trans_no = row_number(i))
+  
+  other2mega <- test %>%
+    dplyr::filter(transition == "other->megaherbivore")
+  
+  points(other2mega$trans_no ~ other2mega$time, 
+         col = my_cols[1], pch = 17)
+  lines(other2mega$trans_no ~ other2mega$time, 
+        col =my_cols[1])
+}
+other2mega <- avg_trans_times %>%
+  dplyr::filter(transition == "other->megaherbivore") %>%
+  dplyr::filter(trans_no <= trans_avg_length[1,2])
+
+points(other2mega$trans_no ~ other2mega$avg_time,
+       col = "yellow", pch = 17)
+lines(other2mega$trans_no ~ other2mega$avg_time, 
+      col = "yellow")
+
+legend("topleft",
+       legend = "other->megaherbivore",
+       col = (my_cols[1]),
+       pch = c(17), pt.lwd = 0.001, bty = "n", cex = 1.8)
+dev.off()
+
+```
+
+
 
 ```{r}
 
