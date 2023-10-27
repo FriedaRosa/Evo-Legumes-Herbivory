@@ -29,10 +29,12 @@ library(prettyGraphs) # for transparancy settings while plotting
 
 # 1. & 2. in Script: 1_CumulativeRates.qmd
 
+## A) Legumes
+
 # 3. Relative Transition rates 
 this part runs a while.. the loop takes about 22 minutes.
 
-## A) Legumes
+
 
 ## Adaptation of ctt function (in loop, save to list)
 
@@ -44,7 +46,7 @@ Reference: [ctt.R](https://github.com/liamrevell/phytools/blob/master/R/ctt.R) (
 
 ```{r}
 #| label: loop
-
+#| eval: false
 
 tic( "loop")
 rm(list=ls())
@@ -414,7 +416,7 @@ load("../output/RData/Legumes_rates_ws.RData")
 ## plot.multiCtt()
 
 ```{r}
-#| label: plot.multiCtt() function
+#| label: plot.multiCtt() function Legumes
 
 plot.multiCtt<-function(x,...){
   if(hasArg(alpha)) alpha<-list(...)$alpha
@@ -586,21 +588,13 @@ final_df <- final_df %>% arrange(segsID)  # You can specify the sorting order
 
 
 
-# Your ggplot code
-ggplot(final_df, aes(y = rate, x = segs_end, col = factor(transition), group = factor(transition))) +
-  #geom_point() +
-  geom_line() +
-  ylim(0, 0.015)+
-  theme_light()+
-  scale_color_viridis(discrete=T)
 
 
 
 ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
   geom_col(position = "identity")+
   ylim(0, 0.015)+
-  theme_light()+
-  scale_fill_viridis(discrete=T, alpha = 0.4)
+  theme_light()
 
 ```
 
@@ -613,14 +607,15 @@ ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
 
 
 armature_transitions <- rates_df
+armature_transitions$transition <- as.factor(armature_transitions$transition)
 
 
 # build new data frame with cumulative number of transitions
 armature_trans_cumul <- data.frame()
 for(n in 1:100){
-  trans <- armature_transitions %>% ungroup() %>%
+  trans <- armature_transitions %>% ungroup() %>% 
     dplyr::filter(N_sim == n) %>%
-    dplyr::group_by(transition) %>%
+    dplyr::group_by(transition) %>%arrange(time) %>%
     dplyr::mutate(trans_no = row_number(N_sim))
   
   armature_trans_cumul <- rbind(armature_trans_cumul, trans)
@@ -669,8 +664,6 @@ avg_trans_times_na2a <- avg_trans_times %>%
 avg_trans_times <- rbind(avg_trans_times_a2na, avg_trans_times_na2a)
 rm(avg_trans_times_a2na, avg_trans_times_na2a)
 
-# export these results to csv in case I need them
-readr::write_csv(avg_trans_times, "../output/CSV/mean_transition_times_armature_MCC.csv")
 
 
 
@@ -683,134 +676,6 @@ myColours = c("lightgrey", "#FFBB00")
 myColoursAlpha <- add.alpha(myColours, alpha=0.4)
 my_cols <- setNames(myColoursAlpha, c("armature->no_armature", "no_armature->armature"))
 
-pdf("../output/Figs/armature_transition_times_mean_hist.pdf", height = 2.8, width = 6)
-min <- min(avg_trans_times$avg_time)
-max <- max(avg_trans_times$avg_time)
-ax <- pretty(min:50, n = 20)
-
-arm_to_no_arm <- avg_trans_times %>%
-  dplyr::filter(transition == "armature->no_armature") %>%
-  dplyr::mutate(arm_to_no_arm = avg_time) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(arm_to_no_arm)
-
-no_arm_to_arm <- avg_trans_times %>%
-  dplyr::filter(transition == "no_armature->armature") %>%
-  dplyr::mutate(no_arm_to_arm = avg_time) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(no_arm_to_arm)
-
-a2na <- hist(arm_to_no_arm$arm_to_no_arm, breaks = ax, plot = FALSE)
-na2a <- hist(no_arm_to_arm$no_arm_to_arm, breaks = ax, plot = FALSE)
-
-plot (a2na, col = myColours[1], xlab = "Time of transitions (mya)",  
-      main = "", ylab = "number of transitions", 
-      ylim = c(0, 30), xlim = c(50,0)) # alter if x values change!
-plot (na2a, col = my_cols[2], add = TRUE)
-
-
-# data for density graph
-arm_to_no_arm <- armature_transitions %>% ungroup() %>%
-  dplyr::filter(transition == "armature->no_armature") %>%
-  dplyr::mutate(arm_to_no_arm = time,
-                rate_arm_to_no_arm = rate) %>%
-  dplyr::select(arm_to_no_arm, rate_arm_to_no_arm, simulation = N_sim)
-no_arm_to_arm <- armature_transitions %>% ungroup() %>%
-  dplyr::filter(transition == "no_armature->armature") %>%
-  dplyr::mutate(no_arm_to_arm = time,
-                rate_no_arm_to_arm = rate) %>%
-  dplyr::select(no_arm_to_arm, rate_no_arm_to_arm, simulation = N_sim)
-
-# Plot density of transitions ==================================================================== #
-# calculate density curve
-density_a2na <- density(arm_to_no_arm$arm_to_no_arm)
-density_na2a <- density(no_arm_to_arm$no_arm_to_arm)
-
-# plot the density
-plot(density_a2na, lwd = 2, col = myColours[1], 
-     xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
-     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
-lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
-dev.off()
-
-# Plot density of rate: ========================================================================== #
-# # calculate density curve
-# density_a2na_rate <- density(arm_to_no_arm$rate_arm_to_no_arm)
-# density_na2a_rate <- density(no_arm_to_arm$rate_no_arm_to_arm)
-# 
-# plot(density_a2na_rate, lwd = 2, col = myColours[1], 
-#      xlim = c(0,0.15), xlab = "Relative Transitions", bty = "l", ylim=c(0, 170),
-#      cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
-# lines(density_na2a_rate, lwd = 2, col = myColours[2], xlim = c(0,0.15))
-# 
-# # add data-points with noise in the X-axis
-# rug(jitter(no_arm_to_arm$rate_no_arm_to_arm), col = my_cols[1])
-# rug(jitter(arm_to_no_arm$rate_arm_to_no_arm), col = my_cols[2])
-
-
-##################
-
-pdf("../output/Figs/RatesPlot.pdf", height = 8, width = 10)
-par(mar = c(5.1, 5.1, 4.1, 2.1))    # increase margins
-
-arm_to_no_arm <- armature_trans_cumul %>%
-  dplyr::filter(transition == "armature->no_armature") %>%
-  mutate(rate_arm_to_no_arm = rate)
-
-# first set up basic plot parameters
-plot(arm_to_no_arm$rate_arm_to_no_arm ~ arm_to_no_arm$time,
-     type = "p", bty = "l", 
-     xlim = c(50,0), ylim = c(0,1),
-     col = my_cols[1], pch = 15,
-     xlab = "Time of transitions (mya)", 
-     ylab = "Cumulative number of transitions",
-     cex.lab = 1.8, cex.axis = 1.8)
-
-# then loop through all data and add all points and lines to plot for 1000 simulations
-for(n in 1:100){
-  
-  no_arm_to_arm <- armature_transitions %>%
-    dplyr::filter(transition == "no_armature->armature") 
-    
-  arm_to_no_arm <- armature_transitions %>%
-    dplyr::filter(transition == "armature->no_armature") 
-  
-  
-  points(arm_to_no_arm$rate ~ arm_to_no_arm$time, 
-         col = my_cols[1], pch = 15)
-  lines(arm_to_no_arm$rate ~ arm_to_no_arm$time, 
-        col = my_cols[1])
-  points(no_arm_to_arm$rate ~ no_arm_to_arm$time, 
-         col = my_cols[2], pch = 17)
-  lines(no_arm_to_arm$rate ~ no_arm_to_arm$time, 
-        col =my_cols[2])
-}
-
-# then add average points and line in blue
-# first prep data
-no_arm_to_arm <- avg_trans_times %>%
-  dplyr::filter(transition == "no_armature->armature") %>%
-  dplyr::filter(trans_no <= trans_avg_length[1,2])
-arm_to_no_arm <- avg_trans_times %>%
-  dplyr::filter(transition == "armature->no_armature") %>%
-  dplyr::filter(trans_no <= trans_avg_length[2,2])
-
-# then add to plot
-points(arm_to_no_arm$trans_no/arm_to_no_arm$avg_edge.length ~ arm_to_no_arm$avg_time,
-       col = "blue", pch = 15)
-lines(arm_to_no_arm$trans_no/arm_to_no_arm$avg_edge.length ~ arm_to_no_arm$avg_time, 
-      col = "blue")
-points(no_arm_to_arm$trans_no/no_arm_to_arm$avg_edge.length ~ no_arm_to_arm$avg_time,
-       col = "darkblue", pch = 17)
-lines(no_arm_to_arm$trans_no/no_arm_to_arm$avg_edge.length ~ no_arm_to_arm$avg_time, 
-      col = "darkblue")
-
-# add legend
-legend("topleft",
-       legend = c("armature->no_armature", "no_armature->armature"),
-       col = c(my_cols[1],my_cols[2]),
-       pch = c(15, 17), pt.lwd = 0.001, bty = "n", cex = 1.8)
-dev.off()
 
 ```
 
@@ -827,75 +692,401 @@ no_arm_to_arm <- armature_transitions %>%
     
 arm_to_no_arm <- armature_transitions %>%
       filter(transition == "armature->no_armature")
-    
+
+
+ggplot() +  
+  # Armature -> No Armature:
+      geom_point(data = arm_to_no_arm, aes(x = time, y = rate, colour = "Armature -> no Armature"), pch = 15, alpha = 0.3) +
+   # No Armature -> Armature:
+      geom_point(data = no_arm_to_arm, aes(x = time, y = rate, colour = "No Armature -> Armature"), pch = 17, alpha = 0.3) +
+      geom_line(data = arm_to_no_arm, aes(x = time, y = rate, colour = "Armature -> no Armature", group = N_sim)) +
+      geom_line(data = no_arm_to_arm, aes(x = time, y = rate, colour = "No Armature -> Armature",group = N_sim)) +
+    # Set plot aesthetics
+    theme_light() + 
+    xlim(45, 0) +
+    ylim(0, 0.23) +
+  scale_color_manual( values=c("lightgrey", "#FFBB00"))+
+    labs(
+      x = "Time since the origin of clade (mya)",
+      y = "Relative Changes per Edge length",
+      title = "Relative Transition Rates")
+
+
 ggplot() + 
-      # Armature -> No Armature:
-      geom_point(data = arm_to_no_arm, aes(x = time, y = rate, colour = "Armature -> no Armature"), pch = 15) +
-      geom_line(data = arm_to_no_arm, aes(x = time, y = rate, colour = "Armature -> no Armature")) +
-      
-      # No Armature -> Armature:
-      geom_point(data = no_arm_to_arm, aes(x = time, y = rate, colour = "No Armature -> Armature"), pch = 17) +
-      geom_line(data = no_arm_to_arm, aes(x = time, y = rate, colour = "No Armature -> Armature")) +
-      
-    geom_point(data = avg_trans_times %>% filter(transition == "armature->no_armature"), 
-               aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "Armature -> no Armature"), 
-               pch = 15) +
-  
-    geom_line(data = avg_trans_times %>% filter(transition == "armature->no_armature"),
-            aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "Armature -> no Armature")) +
-  
-  
-    geom_point(data = avg_trans_times %>% filter(transition == "no_armature->armature"),
+  geom_point(data = avg_trans_times %>% filter(transition == "armature->no_armature"), 
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "Armature -> no Armature"), 
+             pch = 15) +
+   geom_line(data = avg_trans_times %>% filter(transition == "armature->no_armature"),
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "Armature -> no Armature", group = N_sim)) +
+  geom_point(data = avg_trans_times %>% filter(transition == "no_armature->armature"),
              aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "No Armature -> Armature"), 
              pch = 17) +
-  
-    geom_line(data = avg_trans_times %>% filter(transition == "no_armature->armature"),
-            aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "No Armature -> Armature")) +
+   geom_line(data = avg_trans_times %>% filter(transition == "no_armature->armature"),
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "No Armature -> Armature",group = N_sim)) +
+  scale_color_manual(values=c("lightgrey", "#FFBB00"))+
   
   
     # Set plot aesthetics
-    scale_color_viridis(discrete=T, alpha = 0.7)+
     theme_light() + 
     xlim(45, 0) +
-    ylim(0, 0.4) +
+    ylim(0, 0.16) +
     labs(
       x = "Time since the origin of clade (mya)",
-      y = "relative changes per edge.length")
+      y = "Mean Number of Changes/Mean Edge Length",
+      title = "Mean Relative Transition Rates")
 
 ```
 
-#### Plot the rate 2
+#### B) Mammals
+```{r}
+rm(list=ls())
+load("../output/RData/Mammals_rates_ws.RData")
+```
+
+## plot.multiCtt()
+
+```{r}
+#| label: plot.multiCtt() function Mammals
+
+plot.multiCtt<-function(x,...){
+  if(hasArg(alpha)) alpha<-list(...)$alpha
+  else alpha<-0.05
+  segments<-x[[1]]$segments
+  nchanges<-sapply(x,function(x) x$nchanges)
+  if(hasArg(type)) type<-list(...)$type
+  else type<-"rate"
+  edge.length<-sapply(x,function(x) x$edge.length)
+  obj<-list(segments=segments,nchanges=rowMeans(nchanges),
+            edge.length=rowMeans(edge.length),tree=x[[1]]$tree)
+  class(obj)<-"ctt"
+  lower<-max(floor(alpha/2*length(x)),1)
+  upper<-min(ceiling((1-alpha/2)*length(x)),ncol(nchanges))
+  xx<-max(nodeHeights(x[[1]]$tree))-as.vector(t(segments))
+  xx<-c(xx,xx[length(xx):1])
+  y.lower<-if(type=="number") apply(nchanges,1,sort)[lower,] else
+    if(type=="rate") apply(nchanges/edge.length,1,sort)[lower,]
+  y.upper<-if(type=="number") apply(nchanges,1,sort)[upper,] else
+    if(type=="rate") apply(nchanges/edge.length,1,sort)[upper,]
+  y.lower<-as.vector(rbind(y.lower,y.lower))
+  y.upper<-as.vector(rbind(y.upper,y.upper))
+  yy<-c(y.lower,y.upper[length(y.upper):1])
+  args<-list(...)
+  if(!is.null(args$alpha)) args$alpha<-NULL
+  if(is.null(args$col)) args$col<-"blue"
+  if(is.null(args$ylim)) args$ylim<-range(yy)
+  args$x<-obj
+  do.call(plot,args)
+  polygon(xx,yy,col=make.transparent("grey",0.4),border=0)
+}
+
+plot.multiCtt(object_list, type="rate")
+plot.multiCtt(object_list, type="number")
+```
+We can also plot the rates of each simulation separately using plot.ctt() from phytools:
+
+```{r}
+#|label: plot.ctt() function
+
+plot.ctt<-function(x,...){
+  h<-max(nodeHeights(x$tree))
+  args<-list(...)
+  if(!is.null(args$type)){ 
+    type<-args$type
+    args$type<-NULL
+  } else type<-"rate"
+  if(!is.null(args$show.tree)){
+    show.tree<-args$show.tree
+    args$show.tree<-NULL
+  } else show.tree<-FALSE
+  if(!is.null(args$add)){ 
+    add<-args$add
+    args$add<-NULL
+  } else add<-FALSE
+  if(is.null(args$ylim)) 
+    args$ylim<-if(type=="number")c(0,max(x$nchanges)) else 
+      c(0,max(x$nchanges/x$edge.length))
+  if(is.null(args$xlim))
+    args$xlim<-c(max(x$segments),min(x$segments))
+  if(is.null(args$lwd)) args$lwd<-2
+  if(is.null(args$xlab)) args$xlab<-"time since the present"
+  if(is.null(args$ylab)) 
+    args$ylab<-if(type=="number") "mean number of changes" else
+      "mean number of changes / total edge length"
+  args$type<-"l"
+  args$x<-h-as.vector(t(x$segments))
+  args$y<-if(type=="number") rbind(x$nchanges,x$nchanges) else 
+    rbind(x$nchanges/x$edge.length,x$nchanges/x$edge.length)
+  if(!add) do.call(plot,args)
+  else do.call(lines,args)
+  if(show.tree) plotTree(x$tree,add=TRUE,ftype="off",lwd=1,
+                         color=make.transparent("blue",0.1),mar=par()$mar,
+                         direction="leftwards",xlim=args$xlim)
+}
+
+
+plot.ctt(object_list[[1]], type="rate")
+plot.ctt(object_list[[1]], type="number")
+```
+
+
+# 2.1. Post-processing of data
+
+
+
+***To do:***
+
+Currently, if there was no transition of a specific type at a specific time, there is no indication of a rate. However, the rate should be zero if there was no transition. In the following code I try to replicate each time segment twice and add transitions for both types with rates == 0.\
+I'm not done with this yet.
+
+```{r}
+# Make dataframe with rates from the rates_list object for all simulations from the simmap:
+rates_df <- plyr::rbind.fill(rates_list)
+
+
+# Now set columns: rates, Nchanges to 0 if there was no transition
+# Calculate the average transition time based on numbered transitions from 100 simmap simulations
+# set average timing of 0-transition to mean-segment time 
+# then order the dataframe by segment ID:
+rates_df <- rates_df %>%
+  group_by(N_sim, segsID, transition) %>%
+  
+  mutate(rate = ifelse(is.na(transition), 0, rate), # set transition rates 0 if there was no transition
+         
+         Nchanges = ifelse(is.na(transition), 0, Nchanges), # set Nchanges 0 if there was no transition
+         
+         segs_mean = (segs_end+ segs_start)/2) %>% # Adjust the threshold (1e-6) as needed
+  
+  mutate(avg_time = ifelse(Nchanges == 1, time, mean(time))) %>%  # set average time = time if there was only 1 change
+  
+  mutate(avg_time = ifelse(is.na(avg_time), segs_mean, avg_time)) %>% # set time to mean time bin if there was no transition
+  
+  arrange(segsID) %>% unique() 
+
+# Replace NAs in Transition types to set the rates to 0 where no transition occurred:
+rates_df_copy <- rates_df
+
+# Replace "NA" with the first transition type
+rates_df_copy$transition[is.na(rates_df_copy$transition)] <- unique(rates_df_copy$transition)[[2]]
+
+# Create a second copy of the data frame with "NA" transitions
+rates_df_copy2 <- rates_df
+
+# Replace "NA" with the second transition type
+rates_df_copy2$transition[is.na(rates_df_copy2$transition)] <- unique(rates_df_copy2$transition)[[3]]
+
+# Combine the two copies to get the final data frame with replicates
+final_df <- bind_rows(rates_df_copy, rates_df_copy2)
+
+
+########## ====================================================================================== ####
+# Specify the transition type for which you want to ensure rates
+specific_transition_type <- unique(rates_df_copy$transition)[[2]]
+
+# Generate a data frame with all possible combinations of segsID and the specific transition type
+all_combinations <- expand_grid(
+  segsID = unique(final_df$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df1 <- all_combinations %>%
+  left_join(final_df, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))# Generate a data frame with all possible combinations of segsID and the specific transition type
+all_combinations <- expand_grid(
+  segsID = unique(final_df1$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df1 <- all_combinations %>%
+  left_join(final_df1, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))
+########## ====================================================================================== ####
+# Specify the transition type for which you want to ensure rates
+specific_transition_type <- unique(rates_df_copy$transition)[[1]]
+
+# Generate a data frame with all possible combinations of segsID and the specific transition type
+all_combinations2 <- expand_grid(
+  segsID = unique(final_df$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df2 <- all_combinations2 %>%
+  left_join(final_df, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))# Generate a data frame with all possible combinations of segsID and the specific transition type
+
+all_combinations2 <- expand_grid(
+  segsID = unique(final_df2$segsID),
+  transition = specific_transition_type
+)
+
+# Left join the generated data frame with the original data frame
+final_df2 <- all_combinations2 %>%
+  left_join(final_df2, by = c("segsID", "transition")) %>%
+  mutate(rate = ifelse(is.na(rate), 0, rate))
+########## ====================================================================================== ####
+
+
+
+# Sort the data frame if needed
+final_df <- final_df %>% arrange(segsID)  # You can specify the sorting order
+
+# Now final_df contains rows with "NA" in the "transition" column replaced by two different transition types.
+
+
+
+
+
+
+
+
+
+
+ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
+  geom_col(position = "identity")+
+  ylim(0, 0.015)+
+  theme_light()
+
+```
+
+
+### Plotting the rates
+
+#### My adaptation of pollination study using 
+
+```{r}
+## below adapted from other script:  https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R
+
+
+megaherbivore_transitions <- rates_df
+megaherbivore_transitions$transition <- as.factor(megaherbivore_transitions$transition)
+
+
+# build new data frame with cumulative number of transitions
+megaherbivore_trans_cumul <- data.frame()
+for(n in 1:100){
+  trans <- megaherbivore_transitions %>% ungroup() %>%  
+    dplyr::filter(N_sim == n) %>%
+    dplyr::group_by(transition) %>% arrange(time) %>%
+    dplyr::mutate(trans_no = row_number(N_sim))
+  
+  megaherbivore_trans_cumul <- rbind(megaherbivore_trans_cumul, trans)
+}
+rm(n, trans)
+
+
+
+
+# =========================================================================================================== #
+#  Now we are summarizing over the 100 simulations:
+# =========================================================================================================== #
+##### copied from somewhere else in the code from the same script....:
+
+
+# first need to know average number of transitions and across simulations, rounded. 
+trans_avg_length <- megaherbivore_trans_cumul %>%
+  dplyr::group_by(transition, N_sim) %>%
+  dplyr::mutate(no_trans = max(trans_no)) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(trans_no == no_trans) %>%
+  dplyr::group_by(transition) %>%
+  dplyr::mutate(avg_length = round(mean(no_trans), digits = 0)) %>%
+  dplyr::select(transition, avg_length) %>%
+  dplyr::ungroup() %>%
+  dplyr::distinct()
+
+# now knowing this, can rearrange data and average times and edge.lengths across rows
+avg_trans_times <- megaherbivore_trans_cumul %>%
+  dplyr::group_by(transition, trans_no) %>%
+  dplyr::mutate(avg_time = mean(time)) %>%
+  dplyr::mutate(SE_time = sqrt(var(time) / length(time)),
+                avg_edge.length = mean(edge.length)) %>% ungroup() %>%
+  group_by(N_sim, segsID, transition) %>%
+  mutate(avg_Nchanges = mean(Nchanges)) %>%
+  dplyr::select(transition, trans_no, avg_time, SE_time, avg_edge.length, avg_Nchanges) %>%
+  dplyr::distinct()
+
+# reduce avg_trans_times to trans_avg_length
+avg_trans_times_m2o <- avg_trans_times %>%
+  dplyr::filter(transition == "megaherbivore->other") %>%
+  dplyr::filter(trans_no <= trans_avg_length[1,2])
+avg_trans_times_o2m <- avg_trans_times %>%
+  dplyr::filter(transition == "other->megaherbivore") %>%
+  dplyr::filter(trans_no <= trans_avg_length[2,2])
+avg_trans_times <- rbind(avg_trans_times_m2o, avg_trans_times_o2m)
+rm(avg_trans_times_m2o, avg_trans_times_o2m)
+
+
+
+
+#### Plotting ======================================
+
+# install.packages("prettyGraphs") #to set transparancy of colors with "alpha"
+library(prettyGraphs)
+
+myColours = c("lightgrey", "#FFBB00")
+myColoursAlpha <- add.alpha(myColours, alpha=0.4)
+my_cols <- setNames(myColoursAlpha, c("megaherbivore->other", "other->megaherbivore"))
+
+
+```
+
+#### same thing in ggplot2 (rates plot)
 
 ```{r}
 library(ggplot2)
-library(viridis)
-rates_df %>% ungroup() %>% group_by(N_sim, transition) %>% 
-  ggplot(aes(x = segs_end , y = rate, group = as.factor(transition), col = as.factor(transition))) +
-  geom_point()+
-  geom_line()
 
 
-## Plots from pollination study:
+plot.ctt(object, type="rate")
 
-arm_to_no_arm <- rates_df %>%
-  dplyr::filter(transition == "armature->no_armature") %>%
-  dplyr::mutate(arm_to_no_arm = avg_time) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(arm_to_no_arm)
+no_mega_to_mega <- megaherbivore_transitions %>%
+      filter(transition == "other->megaherbivore")
+    
+mega_to_no_mega <- megaherbivore_transitions %>%
+      filter(transition == "megaherbivore->other")
 
-no_arm_to_arm <- avg_trans_times %>%
-  dplyr::filter(transition == "no_armature->armature") %>%
-  dplyr::mutate(no_arm_to_arm = avg_time) %>%
-  dplyr::ungroup() %>%
-  dplyr::select(no_arm_to_arm)
 
-# calculate density curve
-density_a2na <- density(arm_to_no_arm$arm_to_no_arm)
-density_na2a <- density(no_arm_to_arm$no_arm_to_arm)
+ggplot() +  
+  # megaherbivore -> other:
+      geom_point(data = mega_to_no_mega, aes(x = time, y = rate, colour = "megaherbivore -> other"), pch = 15, alpha = 0.3) +
+   # other -> megaherbivore:
+      geom_point(data = no_mega_to_mega, aes(x = time, y = rate, colour = "other -> megaherbivore"), pch = 17, alpha = 0.3) +
+      geom_line(data = mega_to_no_mega, aes(x = time, y = rate, colour = "megaherbivore -> other", group = N_sim)) +
+      geom_line(data = no_mega_to_mega, aes(x = time, y = rate, colour = "other -> megaherbivore",group = N_sim)) +
+    # Set plot aesthetics
+    theme_light() + 
+    xlim(220, 0) +
+    ylim(0, 0.1) +
+  scale_color_manual( values=c("lightgrey", "#FFBB00"))+
+    labs(
+      x = "Time since the origin of clade (mya)",
+      y = "Relative Changes per Edge length",
+      title = "Relative Transition Rates")
 
-# plot the density
-plot(density_a2na, lwd = 2, col = myColours[1], 
-     xlim = c(58,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0, 0.2),
-     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL)
-lines(density_na2a, lwd = 2, col = myColours[2], xlim = c(58,0))
+
+ggplot() + 
+  geom_point(data = avg_trans_times %>% filter(transition == "megaherbivore->other"), 
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "megaherbivore -> other"), 
+             pch = 15) +
+   geom_line(data = avg_trans_times %>% filter(transition == "megaherbivore->other"),
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "megaherbivore -> other", group = N_sim)) +
+  geom_point(data = avg_trans_times %>% filter(transition == "other->megaherbivore"),
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "other -> megaherbivore"), 
+             pch = 17) +
+   geom_line(data = avg_trans_times %>% filter(transition == "other->megaherbivore"),
+             aes(x = avg_time, y = avg_Nchanges / avg_edge.length, colour = "other -> megaherbivore",group = N_sim)) +
+  scale_color_manual(values=c("lightgrey", "#FFBB00"))+
+  
+  
+    # Set plot aesthetics
+    theme_light() + 
+    #xlim(220, 0) +
+    ylim(0, 0.08) +
+    labs(
+      x = "Time since the origin of clade (mya)",
+      y = "Mean Number of Changes/Mean Edge Length",
+      title = "Mean Relative Transition Rates")
+
 ```
+
