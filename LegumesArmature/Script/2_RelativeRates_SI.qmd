@@ -4,6 +4,7 @@ author: "Frieda"
 format: html
 editor: visual
 ---
+
 # 0. Required Libraries
 
 ```{r}
@@ -31,14 +32,15 @@ library(prettyGraphs) # for transparancy settings while plotting
 
 ## A) Legumes
 
-# 3. Relative Transition rates 
+# 3. Relative Transition rates
+
 this part runs a while.. the loop takes about 22 minutes.
-
-
 
 ## Adaptation of ctt function (in loop, save to list)
 
-Reference: [ctt.R](https://github.com/liamrevell/phytools/blob/master/R/ctt.R) (Phytools package)
+Reference:
+[ctt.R](https://github.com/liamrevell/phytools/blob/master/R/ctt.R)
+(Phytools package)
 
 ```         
 > packageVersion("phytools") [1] ‘1.9.16’
@@ -48,10 +50,9 @@ Reference: [ctt.R](https://github.com/liamrevell/phytools/blob/master/R/ctt.R) (
 #| label: loop
 #| eval: false
 
-tic( "loop")
 rm(list=ls())
 mtrees <- readRDS("../output/RDS/legumes_mtrees_multiSimmap.rds")
-
+tree <- readRDS("../output/RDS/Legumes_MCC.rds")
 ### Required function ========================================================================== #
 getChanges<-function(tree){
   states<-sort(unique(getStates(tree)))
@@ -85,62 +86,67 @@ find_segment_id <- function(time) {
 
 ## ============================================================================================= #
 
+```
 
-  # ================================================================= #
-  # Working the multiSiammp
-  # ================================================================= #
+```{r}
+#### Subset to test script::
+set.seed(123)
+species_samp <- sample(tree$tip.label, 30)
 
+tree <- keep.tip(tree, species_samp)
+mtrees <-keep.tip(mtrees, species_samp)
+
+######
+```
+
+```{r}
+tic( "loop")
+
+# ================================================================= #
+# Working the multiSiammp
+# ================================================================= #
+
+# Get all changes from all simulations so that we can loop through them:
+changes <- sapply(mtrees, getChanges) 
   
   
-  # Get all changes from all simulations so that we can loop through them:
-  changes <- sapply(mtrees, getChanges) 
-  
-  
-  # Transform the original changes list of matrices from sapply() for all simulations to dataframe 
+# Transform the original changes list of matrices from sapply() for all simulations to dataframe 
   # add trans_no to each transition based on grouping by transition 
   # (i.e, there are two trans_no = 1, one for each transition type)
   
-  i_changes_list <- list() 
-  for (i in 1:length(changes)) {
-    
-    i_changes <- changes[[i]] # for each simulation from multiSimmap
-    
-    
-    # extract transition types and times and assign ID column for simmap simulation
-    i_changes_df <- data.frame(transition = names(i_changes), time = i_changes, N_sim = i)
-    i_changes_df$transition <- as.factor(i_changes_df$transition)
-    
-    # Add trans_no to each transition from a group (transition type)
-    i_changes_df <- i_changes_df %>%  arrange(time) %>%
-      group_by(transition) %>%
-      mutate(trans_no = row_number())
-    
-    i_changes_list[[i]] <- i_changes_df
-    
-  }
   
-  # Final Table without edge.lengths:
-  changes_table <- plyr::rbind.fill(i_changes_list, fill=T)
-  changes_table_wo_edge <- changes_table
-
-
+i_changes_list <- list() 
+for (i in 1:length(changes)) {
+  i_changes <- changes[[i]] # for each simulation from multiSimmap
   
+  # extract transition types and times and assign ID column for simmap simulation
+  i_changes_df <- data.frame(transition = names(i_changes), time = i_changes, N_sim = i)
+  i_changes_df$transition <- as.factor(i_changes_df$transition)
+    
+  # Add trans_no to each transition from a group (transition type)
+  i_changes_df <- i_changes_df %>%  arrange(time) %>%
+    group_by(transition) %>%
+    mutate(trans_no = row_number())
+    
+  i_changes_list[[i]] <- i_changes_df
+}
+  
+# Final Table without edge.lengths:
+changes_table <- plyr::rbind.fill(i_changes_list, fill=T)
+changes_table_wo_edge <- changes_table
+
 # ====================================================================================================== #
-## Step 1: Loop over each simulation and extract 
+# ~ Step 1: Loop over each simulation and extract 
 # - breaks for segments
 # - edge.lengths
 # - rates for each character state transition
 # ====================================================================================================== #
 
-
 object_list <- list()
 rates_list <- list()
 
-
-
 # First Level of the loop  
 for (Nsimulation in 1:100){ 
-  
   
   # ====================================================================================================== #
   # Setting global variables for the Analysis
@@ -157,7 +163,7 @@ for (Nsimulation in 1:100){
   
   # calculate the time segments based on time since the origin and the time segments that were set by the user
   segs <- cbind(seq(0,h-h/b,h/b),
-              seq(1/b*h,h,h/b))
+                seq(1/b*h,h,h/b))
 
   
   # ====================================================================================================== #
@@ -172,26 +178,24 @@ for (Nsimulation in 1:100){
   # ================================================================= #
   
 
-# Loop through all changes & Calculate average number of changes per time interval (segs; set with "b")
+
+  # Loop through all changes & Calculate average number of changes per time interval (segs; set with "b")
   
-  nchanges<-rep(0,b)
+  nchanges <- rep(0,b)
   for(i in 1:length(changes)) { # loop through all simulations from simmap  
 
-# loop through all individual changes from one simmap simulation and calculate relative changes per time segment
-# nchanges = collects the relative number of changes (of all changes) per segment
+    # loop through all individual changes from one simmap simulation and calculate relative changes per time segment
+    # nchanges = collects the relative number of changes (of all changes) per segment
     
     for(j in 1:length(changes[[i]])) { 
-      
       ind<-which((changes[[i]][j]>segs[,1])+ 
-                   (changes[[i]][j]<=segs[,2])==2)
+                 (changes[[i]][j]<=segs[,2])==2)
       nchanges[ind]<-nchanges[ind]+1/length(changes)
       
       } # closing of 2nd level
-    
     } # closing of 1st level
 
   rm(i,j)  
-  
   
   # ================================================================= #
   # Working changes from each simmap simulation separately:
@@ -205,9 +209,17 @@ for (Nsimulation in 1:100){
   
   # -------------------------------------------------------------------------------------------------------- #
   
-  # Compute Lineages-Through-Time with ltt() function from the phytools package to extract edge.lengths from
-  LTT <- ltt(tree,plot=FALSE)
 
+  
+  # Compute Lineages-Through-Time with ltt() function from the phytools package to extract edge.lengths from
+  LTT <- ltt(tree,plot=FALSE, log.lineages = F)
+  cols<-setNames(palette()[c(2,4,1)],c(unique(names(changes[[1]])),
+    "total"))
+
+  plot(LTT,col=cols,bty="n",las=1,lwd=4,show.tree=FALSE,ylim=c(1,Ntip(tree)),
+    xlab="time (above the root)")
+  
+  
 	# transform LTT data so that we can use it:
   LTT <- cbind(LTT$ltt[2:(length(LTT$ltt)-1)],            # Number of species at each node minus the root
                LTT$times[2:(length(LTT$ltt)-1)],          # "start" time for each node minus the root
@@ -310,7 +322,7 @@ for (Nsimulation in 1:100){
   edge.lengths_all_df <- plyr::rbind.fill(edge.lengths_all)
   changes_table_w_edge <- merge(changes_table_wo_edge, edge.lengths_all_df, by = "time")
   # Write to file (once is enough)
-  write.csv(changes_table_w_edge, "../output/CSV/Legumes_changes_table_w_edgelengths.csv")
+  #write.csv(changes_table_w_edge, "../output/CSV/Legumes_changes_table_w_edgelengths.csv")
 	
 
 # ============================================================================================= #
@@ -402,12 +414,14 @@ rates_df <- rates_df %>%
   arrange(segsID) %>% unique() 
 
 
-save.image("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RData/Legumes_rates_ws.RData")
+#save.image("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RData/Legumes_rates_ws.RData")
 ```
 
-This now gives us the object "object_list", which can be used inside the phytools function plot.multiCtt() to get the overall increases and decreases for the rates (not separated by each rate). We can also plot the rates of each simulation separately using plot.ctt() from phytools
+This now gives us the object "object_list", which can be used inside the
+phytools function plot.multiCtt() to get the overall increases and
+decreases for the rates (not separated by each rate). We can also plot
+the rates of each simulation separately using plot.ctt() from phytools
 Also, we have just created the rates_df for plotting
-
 
 ```{r}
 load("../output/RData/Legumes_rates_ws.RData")
@@ -453,7 +467,8 @@ plot.multiCtt(object_list, type="rate")
 plot.multiCtt(object_list, type="number")
 ```
 
-We can also plot the rates of each simulation separately using plot.ctt() from phytools:
+We can also plot the rates of each simulation separately using
+plot.ctt() from phytools:
 
 ```{r}
 #|label: plot.ctt() function
@@ -501,11 +516,13 @@ plot.ctt(object_list[[1]], type="number")
 
 # 2.1. Post-processing of data
 
-
-
 ***To do:***
 
-Currently, if there was no transition of a specific type at a specific time, there is no indication of a rate. However, the rate should be zero if there was no transition. In the following code I try to replicate each time segment twice and add transitions for both types with rates == 0.\
+Currently, if there was no transition of a specific type at a specific
+time, there is no indication of a rate. However, the rate should be zero
+if there was no transition. In the following code I try to replicate
+each time segment twice and add transitions for both types with rates ==
+0.\
 I'm not done with this yet.
 
 ```{r}
@@ -600,7 +617,7 @@ ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
 
 ### Plotting the rates
 
-#### My adaptation of pollination study using 
+#### My adaptation of pollination study using
 
 ```{r}
 ## below adapted from other script:  https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R
@@ -738,6 +755,7 @@ ggplot() +
 ```
 
 #### B) Mammals
+
 ```{r}
 rm(list=ls())
 load("../output/RData/Mammals_rates_ws.RData")
@@ -782,7 +800,9 @@ plot.multiCtt<-function(x,...){
 plot.multiCtt(object_list, type="rate")
 plot.multiCtt(object_list, type="number")
 ```
-We can also plot the rates of each simulation separately using plot.ctt() from phytools:
+
+We can also plot the rates of each simulation separately using
+plot.ctt() from phytools:
 
 ```{r}
 #|label: plot.ctt() function
@@ -828,14 +848,15 @@ plot.ctt(object_list[[1]], type="rate")
 plot.ctt(object_list[[1]], type="number")
 ```
 
-
 # 2.1. Post-processing of data
-
-
 
 ***To do:***
 
-Currently, if there was no transition of a specific type at a specific time, there is no indication of a rate. However, the rate should be zero if there was no transition. In the following code I try to replicate each time segment twice and add transitions for both types with rates == 0.\
+Currently, if there was no transition of a specific type at a specific
+time, there is no indication of a rate. However, the rate should be zero
+if there was no transition. In the following code I try to replicate
+each time segment twice and add transitions for both types with rates ==
+0.\
 I'm not done with this yet.
 
 ```{r}
@@ -950,10 +971,9 @@ ggplot(final_df, aes(y = rate, x = segs_end, fill = factor(transition))) +
 
 ```
 
-
 ### Plotting the rates
 
-#### My adaptation of pollination study using 
+#### My adaptation of pollination study using
 
 ```{r}
 ## below adapted from other script:  https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R
@@ -1089,4 +1109,3 @@ ggplot() +
       title = "Mean Relative Transition Rates")
 
 ```
-

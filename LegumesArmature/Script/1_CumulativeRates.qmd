@@ -10,9 +10,14 @@ editor: visual
 
 ### References for this code:
 
-The following code is a mixture of code written by **Liam Revell within the Phytools package**, especially from the source code of the ctt() function (version Oct 2023),
+The following code is a mixture of code written by **Liam Revell within
+the Phytools package**, especially from the source code of the ctt()
+function (version Oct 2023),
 
-and from the code for Figure 4 in **Stephens et al., (2023):** [Paper](https://nph.onlinelibrary.wiley.com/doi/10.1111/nph.18993); [GitHub Repo](https://github.com/rubysaltbush/pollination-macroevolution)
+and from the code for Figure 4 in **Stephens et al., (2023):**
+[Paper](https://nph.onlinelibrary.wiley.com/doi/10.1111/nph.18993);
+[GitHub
+Repo](https://github.com/rubysaltbush/pollination-macroevolution)
 
 Ref \[1\] Liam Revell's ctt() function from phytools
 
@@ -81,6 +86,8 @@ setdiff(tree4$tip.label, armature2$Taxon) # 0
 setdiff(armature2$Taxon, tree4$tip.label) # 0
 
 tree <- tree4
+
+#saveRDS(tree, "../output/RDS/Legumes_MCC.rds")
 
 # Make data for Mk models for Armature
 
@@ -229,19 +236,23 @@ saveRDS(mtrees, "../output/RDS/Mammals_mtrees_multiSimmap.rds")
 
 ```
 
-Now we have 2 Simmap RDS objects: each with 100 simulations on the MCC tree (mtrees)
+Now we have 2 Simmap RDS objects: each with 100 simulations on the MCC
+tree (mtrees)
 
-
-# 2. Cumulative Transition rates 
+# 2. Cumulative Transition rates
 
 ## Adaptation of Pollination study code
 
-Based on: Ref\[0\]: [Pollination-Macroevolution Study](https://github.com/rubysaltbush/pollination-macroevolution/), which was based on Ref\[1\]: Liam Revell's [Blog Post](http://blog.phytools.org/2015/08/getting-timing-of-trait-changes-from.html).
+Based on: Ref\[0\]: [Pollination-Macroevolution
+Study](https://github.com/rubysaltbush/pollination-macroevolution/),
+which was based on Ref\[1\]: Liam Revell's [Blog
+Post](http://blog.phytools.org/2015/08/getting-timing-of-trait-changes-from.html).
 
-Transition_times function comes from script Ref\[2\]: [transition_times.R](https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/functions/transition_times.R)
+Transition_times function comes from script Ref\[2\]:
+[transition_times.R](https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/functions/transition_times.R)
 
-Code below function comes from script Ref\[3\]: [Simmap.R](https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R)
-
+Code below function comes from script Ref\[3\]:
+[Simmap.R](https://github.com/rubysaltbush/pollination-macroevolution/blob/main/scripts/analysis/simmap.R)
 
 ### A) Legumes
 
@@ -391,7 +402,9 @@ rm(avg_trans_times_a2na, avg_trans_times_na2a)
 # export these results to csv in case I need them
 readr::write_csv(avg_trans_times, "../output/CSV/Legumes_mean_transition_times_MCC.csv")
 ```
-Now we set our colours for plotting and add some transparancy for the simulation data:
+
+Now we set our colours for plotting and add some transparancy for the
+simulation data:
 
 ```{r}
 #| label: Colors for PArmature
@@ -402,10 +415,12 @@ my_cols <- setNames(myColoursAlpha, c("armature->no_armature", "no_armature->arm
 
 ```
 
-First we will get an overview of the transitions by plotting a histogram and a density graph where x is the the average time of transitions and y is the density of it.
-The figure is saved in the output/Figs/ folder.
+First we will get an overview of the transitions by plotting a histogram
+and a density graph where x is the the average time of transitions and y
+is the density of it. The figure is saved in the output/Figs/ folder.
 
 #### Plot1 Mean transition times density & histogram
+
 ```{r}
 #| label: Plot 1 Mean transition times Histogram Legumes
 #| warning: FALSE
@@ -469,11 +484,9 @@ rug(jitter(arm_to_no_arm$arm_to_no_arm), col = my_cols[1])
 
 #### Plot2 Cumulative Rates Plot
 
-Next we will plot the cummulative transition rates. 
-x = time of the transition
-y = number of transitions (naturally grows with time)
-The figure is saved in the output/Figs/ folder.
-
+Next we will plot the cummulative transition rates. x = time of the
+transition y = number of transitions (naturally grows with time) The
+figure is saved in the output/Figs/ folder.
 
 ```{r, fig.height= 8, fig.width=10}
 #| label: Rates Plot Legumes
@@ -541,6 +554,7 @@ legend("topleft",
        pch = c(15, 17), pt.lwd = 0.001, bty = "n", cex = 1.8)
 #dev.off()
 ```
+
 #### Plot3: Panel Plot (split rates)
 
 ```{r,  fig.height = 10, fig.width = 20}
@@ -646,12 +660,7 @@ legend("topleft",
 #dev.off()
 ```
 
-
-
-
 ### B) Mammals
-
-
 
 ```{r}
 rm(list=ls())
@@ -799,7 +808,9 @@ rm(avg_trans_times_m2o, avg_trans_times_o2m)
 # export these results to csv in case I need them
 readr::write_csv(avg_trans_times, "../output/CSV/Mammals_mean_transition_times_MCC.csv")
 ```
-Now we set our colours for plotting and add some transparancy for the simulation data:
+
+Now we set our colours for plotting and add some transparancy for the
+simulation data:
 
 ```{r}
 #| label: Colors for Plotting Megaherbivores
@@ -810,10 +821,12 @@ my_cols <- setNames(myColoursAlpha, c("megaherbivore->other", "other->megaherbiv
 
 ```
 
-First we will get an overview of the transitions by plotting a histogram and a density graph where x is the the average time of transitions and y is the density of it.
-The figure is saved in the output/Figs/ folder.
+First we will get an overview of the transitions by plotting a histogram
+and a density graph where x is the the average time of transitions and y
+is the density of it. The figure is saved in the output/Figs/ folder.
 
 #### Plot1 Mean transition times density & histogram
+
 ```{r}
 #| label: Plot 1 Mean transition times Histogram Megaherbivores
 #| warning: FALSE
@@ -875,14 +888,11 @@ rug(jitter(mega_to_other$mega_to_other), col = my_cols[1])
 
 ```
 
-
 #### Plot2 Cumulative Rates Plot
 
-Next we will plot the cummulative transition rates. 
-x = time of the transition
-y = number of transitions (naturally grows with time)
-The figure is saved in the output/Figs/ folder.
-
+Next we will plot the cummulative transition rates. x = time of the
+transition y = number of transitions (naturally grows with time) The
+figure is saved in the output/Figs/ folder.
 
 ```{r, fig.height = 10, fig.width=12}
 #| label: Rates Plot Mammals
@@ -1054,4 +1064,3 @@ legend("topleft",
        pch = c(17), pt.lwd = 0.001, bty = "n", cex = 1.8)
 #dev.off()
 ```
-
