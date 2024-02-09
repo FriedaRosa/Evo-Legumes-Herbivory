@@ -84,7 +84,7 @@ grid()
 ## B) Mammals
 
 ```{r}
-#| label: Mammals data & simmap
+#| labalphl: Mammals data & simmap
 
 
 mammals_tree <- readRDS("../input/Mammals/Processed/Mammals_MCC_drop.rds")

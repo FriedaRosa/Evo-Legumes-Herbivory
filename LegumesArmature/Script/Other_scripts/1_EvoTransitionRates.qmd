@@ -2,6 +2,9 @@
 title: "Legumes_Armature_Evo_Analyses_v2"
 author: "Friederike Wölke, Rachel Souza Ferreira, Renske Onstein"
 format: html
+  code:
+    collapse: true
+    folding: hide
 editor: visual
 ---
 
@@ -16,10 +19,6 @@ gc()
 
 # [1] traitData ================================================================= #
 
-## Raw data:
-
-
-
 ## Processed data:
 p.mammals.traits.short <- "../input/Mammals/Processed/mammal_traits_short.csv" # created from this script
 p.mammals.traits.MCC <- "../input/Mammals/Processed/mammal_traits_MCC.csv" # created from this script
@@ -28,9 +27,6 @@ p.legumes.traits.corrected <- "../input/Legumes/Processed/Matrix_all_traits_tips
 
 
 # [2] PhyloTrees ================================================================ #
-
-## Raw data:
-
 
 ## Processed data:
 p.mammals.MCC <- "../input/Mammals/Processed/mammal_MCC.nex" # created from this script
@@ -238,23 +234,7 @@ system.time(
 saveRDS(mtrees, "output/RDS/Mammals_4traits_simmap_100.rds")
 mammals_simmap <- readRDS("../../output/RDS/Mammals_4traits_simmap_100.rds")
 
-##### Quick plot =================
-obj <- ltt(mammals_simmap[[1]], plot = F)
 
-layout(matrix(c(1,2),2,1),heights=c(0.4,0.6))
-
-cols<-setNames(c("gold", "grey", "black"),c(levels(trait),
-    "total"))
-plot(mammals_simmap[[1]],cols,ftype="off",lwd=2,
-    mar=c(0,4.1,1.1,1.1))
-grid()
-legend("topleft",names(cols),pch=22,pt.bg=cols,
-    bty="n",cex=0.8,pt.cex=1.2)
-par(mar=c(5.1,4.1,0,1.1))
-plot(obj,colors=cols,bty="n",las=1,lwd=4,show.tree=FALSE,
-    legend=FALSE,ylim=c(1,Ntip(mammals_tree)),
-    xlab="time (above the root)")
-grid()
 
 
 # 2.4s
@@ -266,8 +246,8 @@ pd_mtrees
 
 
 mammals_simmap_100 <- mtrees
- saveRDS(mammals_simmap_100, paste0(out.path,"RDS/" ,"Mammals_simmap_100.rds"))
- saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_mammals.rds"))
+# saveRDS(mammals_simmap_100, paste0(out.path,"RDS/" ,"Mammals_simmap_100.rds"))
+# saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_mammals.rds"))
 ```
 
 ```{r, eval=F, echo=T}
@@ -297,14 +277,50 @@ legumes_simmap_100 <- mtrees
 
 ```{r}
 mammals_simmap_100 <- readRDS("../../output/RDS/Mammals_simmap_100.rds")
+mammals_simmap_100 <- readRDS("../../output/RDS/Mammals_4traits_simmap_100.rds")
+mtrees <- mammals_simmap_100
+
 legumes_simmap_100 <- readRDS("../../output/RDS/Legumes_simmap_100.rds")
 ```
 
 ```{r}
 obj <- ctt(mtrees, plot=F)
-obj2 <- ctt(mtrees, plot=F, type = "rate")
+
+par(mfrow=c(2,1));
+plot(obj, type = "number"); plot(obj, type = "rate")
 
 
-
-ltt(mtrees[[4]], plot=F, log.lineages = F)
+ltt(mtrees[[1]], plot=F, log.lineages = F)
 ```
+
+### Manual LTT-by trait plot
+
+```{r}
+
+lizard.maps <- mammals_simmap_100
+habitat <- names(mammals_simmap_100[[1]]$mapped.edge[1,])
+
+
+## convert to tree with unbranching nodes
+tt<-map.to.singleton(lizard.maps[[1]])
+## compute all node heights
+H<-nodeHeights(tt)
+## pull out heights all all events
+h<-max(H)-branching.times(tt)
+## get the states at each event
+ss<-setNames(as.factor(names(tt$edge.length)),
+    tt$edge[,2])
+## create a matrix to count lineages
+lineages<-matrix(0,length(h),length(levels(habitat)),
+    dimnames=list(names(h),levels(habitat)))
+## count them
+for(i in 1:length(h)){
+    ii<-intersect(which(h[i]>H[,1]),which(h[i]<=H[,2]))
+    lineages[i,]<-summary(ss[ii])
+}
+## sort by event
+ii<-order(h)
+times<-h[ii]
+lineages<-lineages[ii,]
+```
+
