@@ -34,12 +34,10 @@ rm(list=ls())
 
 # Libraries:
 
-library(phangorn) # to compute MCC tree
-library(evobiR) # reorder data by tree
+
 
 library(phytools) # v. ‘1.9.16’ for phylo stuff
 library(dplyr) # for data handling
-library(evobiR) # v. ‘1.1’ To reorder data based on tree
 library(geiger) # v. ‘2.0.11’ for Mk Models
 library(tictoc) # for time measurements of computations
 library(tidyr) # data handling
@@ -48,192 +46,50 @@ library(prettyGraphs) # for transparancy settings while plotting
 
 ```
 
-# 1. My Data (skip and read back in from RDS)
+# 1. My Data (read back in from RDS)
 
 ## A) Legumes
 
 ```{r}
-#| label: Legumes data & produce simmap
-#| eval: false
-#| include: false
+#| label: Legumes data & simmap
 
-# Read in the data and tree ============================
 
-traitData <- read.csv("../input/Matrix_all_traits.csv", stringsAsFactors = FALSE, header = TRUE)
-tree <- read.tree("../input/Mimo_metachronogram_mmc.tre")
-tree <- as.phylo(tree)
-new_tip_names<-read.csv("../input/replace_tip_labels.csv")
+legumes_tree <- ladderize(readRDS("../input/Legumes/Processed/Legumes_MCC_drop.rds"))
 
-# Subset data by trait 
-armature <- traitData %>% select(Taxon, Armatures) %>% filter(!is.na(Taxon) & !is.na(Armatures)) %>% distinct(.) # 2 species were duplicated (Acacia baileyana and Chidlowiana sanguinea)
 
-# Correct tip names in the tree with new labels
-tree2 <- tree
-tree2$tip.label <- new_tip_names[[2]][match(tree$tip.label, new_tip_names[[1]])]
 
-# match data and tree ===================================
-row.names(armature) <- armature$Taxon
-sp_drop <- setdiff(tree2$tip.label, armature$Taxon)
+legumes_simmap_100 <- readRDS("../output/RDS/Legumes_simmap_100.rds")
+ladderize(legumes_simmap_100)
 
-# Drop these species from the tree, because we need matching data between tree and traits
-tree3 <- drop.tip(tree2, sp_drop)
-tree4 <- ladderize(tree3)
+ obj <- ltt(legumes_simmap_100[[1]], plot=F)
 
-matches <- match(armature$Taxon, tree4$tip.label, nomatch = 0)
-armature2 <- subset(armature, matches != 0)
 
-setdiff(tree4$tip.label, armature2$Taxon) # 0
-setdiff(armature2$Taxon, tree4$tip.label) # 0
-
-tree <- tree4
-
-#saveRDS(tree, "../output/RDS/Legumes_MCC.rds")
-
-# Make data for Mk models for Armature
-
-armature2[armature2=="0"] <- "no_armature"
-armature2[armature2=="1"] <- "armature"
-
-trait <- unique(armature2)
-trait <- ReorderData(tree, trait, taxa.names = "row names")
-
-trait$Armatures <- as.factor(trait$Armatures)
-trait$Taxon <- NULL
-
-# Clean environment to free memory:
-rm(tree2, tree3, tree4, traitData, new_tip_names, armature, matches, sp_drop)
-
-# Mk models ============================
-# estimate the rates of transitioning between ancestral states given a hypothesis (either equal rates(ER), or different rates(ARD))
-
-# computing time = 7s
-tic()
-  equal <- fitDiscrete(tree, trait, model = "ER")
-toc()
-
-# computing time = 20s
-tic()
-  ard <- fitDiscrete(tree, trait, model = "ARD")
-toc()
-
-# Calculate AIC weights
-aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
-weights <- aicw(aic.discrete)
-weights # ARD model performs better for armature/no armature
-
-# we need a slightly different format for Simmap:
-trait2 <- as.factor(trait$Armatures)
-names(trait2) <- rownames(trait)
-
-# For 100 simulation (nsim=100) --> computing time = 167s
-tic()
-  mtrees <- make.simmap(tree, trait2, model = "ARD", nsim = 100)
-toc()
-
-saveRDS(mtrees, "../output/RDS/legumes_mtrees_multiSimmap.rds")
-
-# 3s
-tic()
-  pd_mtrees <- describe.simmap(mtrees, plot = FALSE)
-toc()
+ Armature <- as.factor(rownames(unique(legumes_simmap_100[[1]]$Q)))
+ 
+ layout(matrix(c(1,2),2,1),heights=c(0.4,0.6))
+cols<-setNames(c("gold", "grey", "black"),c(levels(Armature),
+    "total"))
+plot(legumes_simmap_100[[1]],cols,ftype="off",lwd=2,
+    mar=c(0,4.1,1.1,1.1))
+grid()
+legend("topleft",names(cols),pch=22,pt.bg=cols,
+    bty="n",cex=0.8,pt.cex=1.2)
+par(mar=c(5.1,4.1,0,1.1))
+plot(obj,colors=cols,bty="n",las=1,lwd=4,show.tree=FALSE,
+    legend=FALSE,ylim=c(1,Ntip(legumes_tree)),
+    xlab="time (above the root)")
+grid()
 ```
 
 ## B) Mammals
 
 ```{r}
-#| label: Mammals data & produce simmap
-#| eval: false
-#| include: false
-
-# Data & Tree:
-traitData <- read.csv("../input/Mammals/Trait_data.csv")
-tree <- read.nexus("../input/Mammals/mammal_MCC.nex")
-
-# Make MCC tree:
-MCC <- mcc(tree, tree = TRUE, part = NULL, rooted = TRUE)
-
-# make dataframe with species, mass  trait
-df1 <- traitData[,c(1,6,12,20)] #Terrestrial, Mass.g, Diet.Plant
-subset_df <- df1[df1[, 2] == 1, ] # Terrestrial = 1
-
-# Initialize a new column filled with zeros
-subset_df$Condition_Met <- 0 
-
-# Update this column to 1 for animals that meet both conditions (mass >= 10000 and diet >= 95)
-subset_df$Condition_Met[subset_df$Mass.g >= 10000 & subset_df$Diet.Plant >= 95] <- 1
+#| label: Mammals data & simmap
 
 
-mammal_traits <- subset_df[,c(1,5)]
-write.csv(mammal_traits, file = "../output/CSV/mammal_traits.csv", row.names = FALSE)
-
-
-## Match Data & Tree:
-tree2 <- ladderize(MCC)
-
-row.names(mammal_traits) <- mammal_traits$Binomial.1.2
-sp_drop <- setdiff(tree2$tip.label, mammal_traits$Binomial.1.2)
-
-# Drop these species from the tree, because we need matching data between tree and traits
-tree3 <- drop.tip(tree2, sp_drop)
-tree4 <- ladderize(tree3)
-
-matches <- match(mammal_traits$Binomial.1.2, tree4$tip.label, nomatch = 0)
-mammal_traits2 <- subset(mammal_traits, matches != 0)
-data2 <- ReorderData(tree4, mammal_traits2, taxa.names = "row names")
-dd3 <- data2
-tree <- tree4
-
-# Trait Vector:
-Mass <- numeric(length = nrow(dd3))
-unique(dd3$Condition_Met)
-# Create the 'Mass' factor based on the 'Condition_Met' column
-Mass <- ifelse(dd3$Condition_Met == 0, "other", "megaherbivore")
-str(Mass)
-head(Mass)
-table(Mass)
-
-# Convert to a factor
-Mass <- as.factor(Mass)
-
-# Display the levels of Mass to confirm
-print(levels(Mass))
-
-# Reorder data if needed (assuming ReorderData and tree2 are defined)
-Mass <- ReorderData(tree, Mass, taxa.names="names")
-names(Mass) <- rownames(dd3)
-# ordered trait vector for models (not dataframe)
-str(Mass) # make sure it's a factor
-
-
-trait <- Mass
-
-# Mk models ============================
-# estimate the rates of transitioning between ancestral states given a hypothesis (either equal rates(ER), or different rates(ARD))
-
-# computing time = 11s
-tic("ER")
-  equal <- fitDiscrete(tree, trait, model = "ER")
-toc()
-
-# computing time = 40s
-tic("ARD")
-  ard <- fitDiscrete(tree, trait, model = "ARD")
-toc()
-
-# Calculate AIC weights
-aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
-weights <- aicw(aic.discrete)
-weights # ARD model performs better for megaherbivore/no other
-
-
-# For 100 simulation (nsim=100) --> computing time = 442s
-tic("simmap")
-  mtrees <- make.simmap(tree, trait, model = "ARD", nsim = 100)
-toc()
-
-
-saveRDS(mtrees, "../output/RDS/Mammals_mtrees_multiSimmap.rds")
-
+mammals_tree <- readRDS("../input/Mammals/Processed/Mammals_MCC_drop.rds")
+mammals_simmap_100 <- readRDS("../output/RDS/Mammals_simmap_100.rds")
+mammals_simmap_100_4 <- readRDS("../output/RDS/Mammals_4traits_simmap_100.rds")
 ```
 
 Now we have 2 Simmap RDS objects: each with 100 simulations on the MCC
@@ -257,7 +113,7 @@ Code below function comes from script Ref\[3\]:
 ### A) Legumes
 
 ```{r}
-rm(list=ls())
+
 #| label: Fig4 Pollination Study Data Preparation
 
 ## Ref[1], Ref[0] -> Ref[2]
@@ -332,7 +188,7 @@ transition_times <- function(simmap){
 
 # Ref[0] -> Ref[3]
 
-mtrees <- readRDS("../output/RDS/legumes_mtrees_multiSimmap.rds")
+mtrees <- legumes_simmap_100
 
 # apply function across list of multiple simulations:
 
@@ -400,14 +256,14 @@ avg_trans_times <- rbind(avg_trans_times_a2na, avg_trans_times_na2a)
 rm(avg_trans_times_a2na, avg_trans_times_na2a)
 
 # export these results to csv in case I need them
-readr::write_csv(avg_trans_times, "../output/CSV/Legumes_mean_transition_times_MCC.csv")
+#readr::write_csv(avg_trans_times, "../output/CSV/Legumes_mean_transition_times_MCC.csv")
 ```
 
 Now we set our colours for plotting and add some transparancy for the
 simulation data:
 
 ```{r}
-#| label: Colors for PArmature
+#| label: Colors for Armature
 
 myColours = c("lightgrey", "#FFBB00")
 myColoursAlpha <- add.alpha(myColours, alpha=0.2)
@@ -484,7 +340,7 @@ rug(jitter(arm_to_no_arm$arm_to_no_arm), col = my_cols[1])
 
 #### Plot2 Cumulative Rates Plot
 
-Next we will plot the cummulative transition rates. x = time of the
+Next we will plot the cumulative transition rates. x = time of the
 transition y = number of transitions (naturally grows with time) The
 figure is saved in the output/Figs/ folder.
 
@@ -738,8 +594,8 @@ transition_times <- function(simmap){
 
 # Ref[0] -> Ref[3]
 
-mtrees <- readRDS("../output/RDS/Mammals_mtrees_multiSimmap.rds")
-
+#mtrees <- readRDS("../output/RDS/Mammals_mtrees_multiSimmap.rds")
+mtrees <- readRDS("../output/RDS/Mammals_4traits_simmap_100.rds")
 # apply function across list of multiple simulations:
 
 megaherbivore_transitions <- data.frame()
@@ -794,19 +650,29 @@ avg_trans_times <- megaherbivore_trans_cumul %>%
   dplyr::select(transition, trans_no, avg_time, SE_time) %>%
   dplyr::distinct()
 
-# reduce avg_trans_times to trans_avg_length
-avg_trans_times_m2o <- avg_trans_times %>%
-  dplyr::filter(transition == "megaherbivore->other") %>%
-  dplyr::filter(trans_no <= trans_avg_length[1,2])
 
-avg_trans_times_o2m <- avg_trans_times %>%
-  dplyr::filter(transition == "other->megaherbivore") %>%
-  dplyr::filter(trans_no <= trans_avg_length[2,2])
-avg_trans_times <- rbind(avg_trans_times_m2o, avg_trans_times_o2m)
-rm(avg_trans_times_m2o, avg_trans_times_o2m)
+
+avg_trans_list <- list()
+for (i in seq_along(unique(trans_avg_length$transition))){ # i in 10
+  type <- unique(trans_avg_length$transition)[i]
+  avg_trans_trait <- avg_trans_times %>%
+    dplyr::filter(transition == type) %>%
+    dplyr::filter(trans_no <= trans_avg_length[i,2]) 
+  
+  avg_trans_list[[i]] <- avg_trans_trait 
+}
+
+
+avg_trans_df <- do.call(rbind, avg_trans_list)
+write.csv(avg_trans_df, "../output/CSV/Average_transition_times_4traits_mammals.csv")
+
 
 # export these results to csv in case I need them
 readr::write_csv(avg_trans_times, "../output/CSV/Mammals_mean_transition_times_MCC.csv")
+```
+
+```{r, fig.width = 4, fig.height = 6}
+par(mar=c(20,4,4,4));plot(mtrees[[1]]); axisPhylo()
 ```
 
 Now we set our colours for plotting and add some transparancy for the
@@ -815,9 +681,24 @@ simulation data:
 ```{r}
 #| label: Colors for Plotting Megaherbivores
 
-myColours = c("lightgrey", "#FFBB00")
+transition_states <- unique(trans_avg_length$transition)
+library(viridis)
+viridis(n=10)
+avg_trans_df
+
+
+myColours = c("darkgrey", "darkgrey", "lightgrey", "#FFBB00", "lightgrey")
+
+myColours = c(viridis(n=10))
 myColoursAlpha <- add.alpha(myColours, alpha=0.2)
-my_cols <- setNames(myColoursAlpha, c("megaherbivore->other", "other->megaherbivore"))
+my_cols <- setNames(myColoursAlpha, transition_states)
+
+
+
+
+ggplot(data = avg_trans_df, 
+       aes(y = as.factor(transition), x = avg_time, fill = as.factor(transition) ))+ 
+  geom_boxplot()
 
 ```
 
@@ -838,6 +719,43 @@ is the density of it. The figure is saved in the output/Figs/ folder.
 min <- min(avg_trans_times$avg_time)
 max <- max(avg_trans_times$avg_time)
 ax <- pretty(min:max, n = 20)
+
+
+
+
+
+hist_list <- list()
+for (i in seq_along(unique(trans_avg_length$transition))){ # i in 10
+  type <- unique(trans_avg_length$transition)[i]
+  trans_i <- avg_trans_times %>%
+    dplyr::filter(transition == type) 
+  
+  histo <- hist(trans_i$avg_time, breaks = ax, plot = FALSE)
+  p_histo <- plot (histo, col = myColours[1], xlab = "Time of transitions (mya)",  
+      main = "", ylab = "number of transitions", 
+      ylim = c(0, 30), xlim = c(220,0))
+
+  
+  
+  
+  density_i <- megaherbivore_transitions %>%
+  dplyr::filter(transition == type) %>%
+  dplyr::mutate(other_to_mega = time) %>%
+  dplyr::select(transition, time, simulation = i)
+  
+  # calculate density curve
+  density_p <- density(density_i$time)
+  # plot the density
+  p_density <- plot(density_p, lwd = 2, col = myColours, 
+     xlim = c(220,0), xlab = "Time of transitions (mya)", bty = "l", ylim=c(0,0.1),
+     cex.lab = 1.4, cex.axis = 1.4, main = NULL, sub = NULL, title = NULL);
+  title(main=paste0(type))
+  
+  hist_list[[i]] <- list(p_histo, p_density, density_p)
+  
+  }
+
+
 
 mega_to_other <- avg_trans_times %>%
   dplyr::filter(transition == "megaherbivore->other") %>%

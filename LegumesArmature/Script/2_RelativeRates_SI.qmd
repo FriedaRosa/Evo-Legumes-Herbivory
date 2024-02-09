@@ -14,7 +14,6 @@ rm(list=ls())
 
 # Libraries:
 
-library(phangorn) # to compute MCC tree
 library(evobiR) # reorder data by tree
 
 library(phytools) # v. ‘1.9.16’ for phylo stuff

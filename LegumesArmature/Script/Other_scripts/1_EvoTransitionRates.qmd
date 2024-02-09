@@ -44,7 +44,7 @@ p.legumes.MCC_drop <- "../input/Legumes/Processed/Legumes_MCC_drop.rds"
 # General paths ============================================================= #
 
 ## Out path
-out.path <- "../output/"
+out.path <- "../../output/"
 
 ```
 
@@ -116,10 +116,10 @@ library(dplyr)
 # Final pruned MCC tree:
 
 #tree_mammals <- mammal_PhyloSubset
-tree_mammals <- readRDS("../../input/Mammals/Processed/Mammals_MCC_drop.rds")
+tree_mammals <- ladderize(readRDS("../../input/Mammals/Processed/Mammals_MCC_drop.rds"))
 
 #tree_legumes <- mimo_PhyloSubset
-tree_legumes <- readRDS("../../input/Legumes/Processed/Legumes_MCC_drop.rds")
+tree_legumes <- ladderize(readRDS("../../input/Legumes/Processed/Legumes_MCC_drop.rds"))
 
 # Vector with Megaherbivory information:
 #trait_mammals <- Mass
@@ -136,26 +136,8 @@ trait_legumes <- readRDS("../../input/Legumes/Processed/Armature.rds")
 # Mk models ============================
 # estimate the rates of transitioning between ancestral states given a hypothesis 
 # (either equal rates(ER), or different rates(ARD))
-tree <- readRDS("../../input/Mammals/Processed/Mammals_MCC_drop.rds")
+tree <- ladderize(readRDS("../../input/Mammals/Processed/Mammals_MCC_drop.rds"))
 trait <- readRDS("../../input/Mammals/Processed/Mammals_traits_drop.rds")
-# Select Mass trait (and make a vector from it)
-Mass <- numeric(length = nrow(trait))
-
-# Create the 'Mass' factor based on the 'Condition_Met' column
-Mass <- ifelse(trait$Condition_Met == 0, "other", "megaherbivore")
-
-# Convert to a factor
-Mass <- as.factor(Mass)
-table(Mass)
-
-# Reorder data if needed (assuming ReorderData and tree2 are defined)
-
-names(Mass) <- rownames(trait)
-Mass <- evobiR::ReorderData(tree, Mass, taxa.names="names")
-
-trait <- Mass
-
-
 
 # computing time = 2.297s
 system.time(
@@ -167,11 +149,19 @@ system.time(
   ard <- fitDiscrete(tree, trait, model = "ARD")
 )
 
+# computing time = 8.726s
+system.time(
+  sym <- fitDiscrete(tree, trait, model = "SYM")
+)
+
+
 # Calculate AIC weights
-aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
+aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic, sym$opt$aic), c("equal", "different", "symmetric"))
 weights <- aicw(aic.discrete)
 weights # ARD model performs better for megaherbivore/other
 
+mammals_tree <- tree
+mammals_trait <- trait
 
 rm(trait, tree, equal, ard, aic.discrete, weights)
 
@@ -182,8 +172,31 @@ rm(trait, tree, equal, ard, aic.discrete, weights)
 # estimate the rates of transitioning between ancestral states given a hypothesis 
 # (either equal rates(ER), or different rates(ARD))
 
-trait <- readRDS("../../input/Legumes/Processed/Legumes_traits_drop.rds")
-tree <- readRDS("../../input/Legumes/Processed/Legumes_MCC_drop.rds")
+mimo_traitDataSubset2 <- readRDS("../../input/Legumes/Processed/Legumes_traits_drop.rds")
+tree <- ladderize(readRDS("../../input/Legumes/Processed/Legumes_MCC_drop.rds"))
+
+
+
+
+# Select Armatures trait (and make a vector from it)
+Armature <- numeric(length = nrow(mimo_traitDataSubset2))
+
+# Create the 'Armature' factor based on the 'Armatures' column
+Armature <- ifelse(mimo_traitDataSubset2$Armatures == 0, "no_armature", "armature")
+
+# Convert to a factor
+Armature <- as.factor(Armature)
+table(Armature)
+
+# Reorder data if needed (assuming ReorderData and tree2 are defined)
+Armature <- ReorderData(mimo_PhyloSubset, Armature, taxa.names="names")
+names(Armature) <- rownames(mimo_traitDataSubset2)
+
+# ordered trait vector for models (not dataframe)
+str(Armature) # make sure it's a factor
+trait <- Armature
+
+
 
 # computing time = 2.297s
 system.time(
@@ -198,23 +211,51 @@ system.time(
 # Calculate AIC weights
 aic.discrete <- setNames(c(equal$opt$aic, ard$opt$aic), c("equal", "different"))
 weights <- aicw(aic.discrete)
-weights # ARD model performs better for megaherbivore/other
+weights # ARD model performs better for armature/no armature
 
+legumes_tree <- tree
+legumes_trait <- trait
 
-rm(trait, tree, equal, ard, aic.discrete, weights)
+rm(trait, tree, equal, ard, aic.discrete, weights, mimo_traitDataSubset2)
 ```
 
 ### - Simmap Reconstructions
 
 ```{r, eval=F, echo=T}
 
-trait <- trait_mammals
-tree <- tree_mammals
+trait <- mammals_trait
+
+trait <- as.factor(mammals_trait$Trait_Herbivory)
+names(trait) <- rownames(mammals_trait)
+
+tree <- ladderize(mammals_tree)
 
 # For 100 simulation (nsim=100) --> computing time = 147.31s
 system.time(
   mtrees <- make.simmap(tree, trait, model = "ARD", nsim = 100)
 )
+
+saveRDS(mtrees, "output/RDS/Mammals_4traits_simmap_100.rds")
+mammals_simmap <- readRDS("../../output/RDS/Mammals_4traits_simmap_100.rds")
+
+##### Quick plot =================
+obj <- ltt(mammals_simmap[[1]], plot = F)
+
+layout(matrix(c(1,2),2,1),heights=c(0.4,0.6))
+
+cols<-setNames(c("gold", "grey", "black"),c(levels(trait),
+    "total"))
+plot(mammals_simmap[[1]],cols,ftype="off",lwd=2,
+    mar=c(0,4.1,1.1,1.1))
+grid()
+legend("topleft",names(cols),pch=22,pt.bg=cols,
+    bty="n",cex=0.8,pt.cex=1.2)
+par(mar=c(5.1,4.1,0,1.1))
+plot(obj,colors=cols,bty="n",las=1,lwd=4,show.tree=FALSE,
+    legend=FALSE,ylim=c(1,Ntip(mammals_tree)),
+    xlab="time (above the root)")
+grid()
+
 
 # 2.4s
 system.time(
@@ -225,14 +266,14 @@ pd_mtrees
 
 
 mammals_simmap_100 <- mtrees
-# saveRDS(mammals_simmap_100, paste0(out.path,"RDS/" ,"Mammals_simmap_100.rds"))
-# saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_mammals.rds"))
+ saveRDS(mammals_simmap_100, paste0(out.path,"RDS/" ,"Mammals_simmap_100.rds"))
+ saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_mammals.rds"))
 ```
 
 ```{r, eval=F, echo=T}
 
-trait <- trait_legumes
-tree <- tree_legumes
+trait <- legumes_trait
+tree <- ladderize(legumes_tree)
 
 # For 100 simulation (nsim=100) --> computing time = 147.31s
 system.time(
@@ -247,12 +288,23 @@ system.time(
 pd_mtrees
 
 
-mammals_simmap_100 <- mtrees
-# saveRDS(mammals_simmap_100, paste0(out.path,"RDS/" ,"Mammals_simmap_100.rds"))
-# saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_mammals.rds"))
+legumes_simmap_100 <- mtrees
+#saveRDS(legumes_simmap_100, paste0(out.path,"RDS/" ,"Legumes_simmap_100.rds"))
+#saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_legumes.rds"))
+
+
 ```
 
 ```{r}
 mammals_simmap_100 <- readRDS("../../output/RDS/Mammals_simmap_100.rds")
 legumes_simmap_100 <- readRDS("../../output/RDS/Legumes_simmap_100.rds")
+```
+
+```{r}
+obj <- ctt(mtrees, plot=F)
+obj2 <- ctt(mtrees, plot=F, type = "rate")
+
+
+
+ltt(mtrees[[4]], plot=F, log.lineages = F)
 ```

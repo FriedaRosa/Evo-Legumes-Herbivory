@@ -1,6 +1,6 @@
 rm(list=ls())
 gc()
-setwd("../")
+setwd("LegumesArmature/")
 
 ## Output path
 out.path <- "output/"
@@ -12,7 +12,7 @@ library(phytools)
 library(dplyr)
 library(evobiR)
 library(phangorn)
-
+library(ape)
 
 ## Script to create final MCC tree and data for A) Mammals and B) Legumes =====  #
 
@@ -24,7 +24,7 @@ p.mammals.1000trees <- "input/Mammals/Raw/mammal_1000.nex" # 1000 trees from pos
 tree_mammals <- read.nexus(p.mammals.1000trees) # Raw Data
 
 MCC_mammals <- mcc(tree_mammals, tree = TRUE, part = NULL, rooted = TRUE) # Data Processing
-
+# saveRDS(MCC_mammals, paste0(out.path, "RDS/MCC_mammals.rds"))
 # write.tree(MCC_mammals, paste(p.mammals.MCC)) # Procesed Data (MCC tree)
 
 rm(tree_mammals) # remove raw data
@@ -45,12 +45,28 @@ mammal_traitData2 <- mammal_traitData[,c(1,6,12,20)]
 mammal_subset_df <- mammal_traitData2[mammal_traitData2[, 2] == 1, ]
 
 # Initialize a new column filled with zeros
-mammal_subset_df$Condition_Met <- 0 
+mammal_subset_df$non_herb_small <- 0 
+mammal_subset_df$non_herb_large <- 0 
+mammal_subset_df$herb_small <- 0 
+mammal_subset_df$herb_large <- 0 
+mammal_subset_df$Trait_Herbivory <- "NA"
 
 # Update this column to 1 for animals that meet both conditions (mass >= 10000 and diet >= 95)
-mammal_subset_df$Condition_Met[mammal_subset_df$Mass.g >= 10000 & mammal_subset_df$Diet.Plant >= 95] <- 1
+mammal_subset_df$non_herb_small[mammal_subset_df$Mass.g <= 10000 & mammal_subset_df$Diet.Plant <= 95] <- 1
+mammal_subset_df$non_herb_large[mammal_subset_df$Mass.g >= 10000 & mammal_subset_df$Diet.Plant <= 95] <- 1
+mammal_subset_df$herb_small[mammal_subset_df$Mass.g <= 10000 & mammal_subset_df$Diet.Plant >= 95] <- 1
+mammal_subset_df$herb_large[mammal_subset_df$Mass.g >= 10000 & mammal_subset_df$Diet.Plant >= 95] <- 1
 
-mammal_traitData3 <- mammal_subset_df[,c(1,5)]
+
+mammal_subset_df$Trait_Herbivory[mammal_subset_df$Mass.g <= 10000 & mammal_subset_df$Diet.Plant <= 95] <- "non_herb_small"
+mammal_subset_df$Trait_Herbivory[mammal_subset_df$Mass.g >= 10000 & mammal_subset_df$Diet.Plant <= 95] <- "non_herb_large"
+mammal_subset_df$Trait_Herbivory[mammal_subset_df$Mass.g <= 10000 & mammal_subset_df$Diet.Plant >= 95] <- "herb_small"
+mammal_subset_df$Trait_Herbivory[mammal_subset_df$Mass.g >= 10000 & mammal_subset_df$Diet.Plant >= 95] <- "herb_large"
+
+
+
+mammal_traitData3 <- mammal_subset_df[,c(1,9)]
+mammal_traitData3$Trait_Herbivory <- as.factor(mammal_traitData3$Trait_Herbivory)
 str(mammal_traitData3)
 
 # write.csv(mammal_traitData, file = paste(p.mammals.traits.short), row.names = FALSE)
@@ -71,7 +87,7 @@ mammal_intersectTaxa <- intersect(mammal_traitData$Binomial.1.2, MCC_mammals$tip
 # Drop species from the trait data
 mammal_traitDataSubset <- subset(mammal_traitData, Binomial.1.2 %in% mammal_intersectTaxa)
 mammal_traitDataSubset2 <- data.frame(row.names = mammal_traitDataSubset$Binomial.1.2, 
-                                      Condition_Met = mammal_traitDataSubset$Condition_Met)
+                                      Trait_Herbivory = mammal_traitDataSubset$Trait_Herbivory)
 # write.csv(mammal_traitDataSubset2, paste(p.mammals.traits.MCC))
 
 # Drop tips from the tree
@@ -83,23 +99,20 @@ rm(mammal_traitDataSubset, mammal_intersectTaxa)
 
 
 
-
+table(mammal_traitDataSubset2)
 
 
 
 # Select Mass trait (and make a vector from it)
-Mass <- numeric(length = nrow(mammal_traitDataSubset2))
-
-# Create the 'Mass' factor based on the 'Condition_Met' column
-Mass <- ifelse(mammal_traitDataSubset2$Condition_Met == 0, "other", "megaherbivore")
-
+Mass <- mammal_traitDataSubset2$Trait_Herbivory
+names(Mass) <- row.names(mammal_traitDataSubset2)
 # Convert to a factor
 Mass <- as.factor(Mass)
 table(Mass)
 
 # Reorder data if needed (assuming ReorderData and tree2 are defined)
 Mass <- ReorderData(mammal_PhyloSubset, Mass, taxa.names="names")
-names(Mass) <- rownames(mammal_traitDataSubset2)
+
 
 # ordered trait vector for models (not dataframe)
 str(Mass) # make sure it's a factor
@@ -139,7 +152,7 @@ legumes_dd <- legumes_traitData  %>%
 
 # Load phylogeny
 p.legumes.MCC <- "input/Legumes/Raw/Mimo_metachronogram_mmc.tre" # Legumes MCC tree
-MCC_legumes <- read.tree(p.legumes.MCC)
+MCC_legumes <- as.phylo(read.tree(p.legumes.MCC))
 
 ## adjust tip names
 #  Tip labels to match data and phylo
@@ -178,7 +191,7 @@ mimo_intersectTaxa <- intersect(legume_traits$Tiplabels_metatree, MCC_legumes$ti
 mimo_traitDataSubset <- subset(legume_traits, Tiplabels_metatree %in% mimo_intersectTaxa) %>% 
   select(Tiplabels_metatree, Armatures) %>% 
   distinct(.)
-mimo_traitDataSubset2 <- data.frame(row.names = mimo_traitDataSubset$Binomial.1.2, 
+mimo_traitDataSubset2 <- data.frame(row.names = mimo_traitDataSubset$Tiplabels_metatree, 
                                     Armatures = mimo_traitDataSubset$Armatures)
 
 mimo_PhyloSubset <- drop.tip(MCC_legumes,
@@ -186,6 +199,7 @@ mimo_PhyloSubset <- drop.tip(MCC_legumes,
 
 rm(mimo_traitDataSubset, mimo_intersectTaxa)
 
+saveRDS(mimo_traitDataSubset2, "input/Legumes/Processed/Legumes_traits_drop.rds")
 
 
 
