@@ -5,7 +5,7 @@ format: html
 editor: visual
 ---
 
-```{r, message=FALSE}
+```{r, cleaning, message=FALSE}
 rm(list=ls())
 gc()
 ```
@@ -153,7 +153,6 @@ rm(trait, tree, equal, ard, aic.discrete, weights)
 ### Simmap ASR
 
 ```{r, simmap, include = T, eval = F}
-
 trait <- mammals_trait
 
 trait <- as.factor(mammals_trait$Trait_Herbivory)
@@ -180,33 +179,12 @@ pd_mtrees
 mammals_simmap_100 <- mtrees
 # saveRDS(mammals_simmap_100, paste0(out.path,"RDS/" ,"Mammals_4traits_simmap_100.rds"))
 # saveRDS(pd_mtrees, paste0(out.path,"RDS/" ,"pd_mtrees_mammals_4traits.rds"))
-```
-
-#### Simmap Summary
-
-```{r}
-pd_mammals <- readRDS("../output/RDS/pd_mtrees_mammals_4traits.rds")
-print(pd_mammals)
-
-mammals_simmap <- readRDS("../output/RDS/Mammals_4traits_simmap_100.rds")
-mammals_simmap[[1]]$Q
 
 ```
-
-Table 1: Transition Matrix (Q-Matrix) used to estimate transitions
-between trait states (table created manually from code chunk output
-above)
-
-|                    | herb large       | herb small       | non-herb large   | non-herb small   |
-|---------------|---------------|---------------|---------------|---------------|
-| **herb large**     | --               | \` 0.0054 \`\`\` | \` 0.0012 \`\`\` | \` 0.0000 \`\`\` |
-| **herb small**     | \` 0.0037 \`\`\` | --               | \` 0.0003 \`\`\` | \` 0.0129 \`\`\` |
-| **non-herb large** | \` 0.0093 \`\`\` | \` 0.0007 \`\`\` | --               | \` 0.0286 \`\`\` |
-| **non-herb small** | \` 0.0000 \`\`\` | \` 0.0086 \`\`\` | \` 0.0021 \`\`\` | --               |
 
 ## Based on script:New_Figures_Jan24.R
 
-```{r, message = F}
+```{r, libraries, message = F}
 rm(list=ls())
 library(dplyr)
 library(rstatix)
@@ -219,7 +197,9 @@ library(prettyGraphs)
 
 ```
 
-```{r}
+### Import Changes Table & Simmap objects
+
+```{r, data}
 #### Data =====================================================================
 # changes_table_Mammals <- read.csv("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/CSV/4traits_Mammals_changes_table_wo_edgelengths.csv")
 
@@ -227,9 +207,14 @@ changes_table_Mammals <- read.csv("~/GitHub/Evo-Legumes-Herbivory/LegumesArmatur
 
 mtrees_M <- readRDS("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RDS/Mammals_4traits_simmap_100.rds")
 
+pd_mammals <- readRDS("../output/RDS/pd_mtrees_mammals_4traits.rds")
+
+
 ```
 
-```{r}
+### Create Plot dataframe
+
+```{r, transition rates}
 ageM <- max(nodeHeights(mtrees_M[[1]])) # root age: 217.84 Ma years old
 
 changes_table_Mammals <- changes_table_Mammals %>% 
@@ -258,42 +243,158 @@ plot_df <- changes_table_Mammals %>%
   distinct() 
 plot_df
 
-```
-
-```{r}
-
-cols<-setNames(c("#009E50", "#709E01", "#E69F00", "#E68F90", "darkgrey"),c("herb_large", "herb_small", "non_herb_large", "non_herb_small", "total"))
-
-#cols <- viridis::viridis_pal()(10)
-
-
-cols<-setNames(c("#00441b", "#b8e186", "#E69F00", "#E68F90"),c("herb_large", "herb_small", "non_herb_large", "non_herb_small"))
+# Reorder factors :
+## 1. [3],[6] transitions from other (herb small, non-herb large) to megaherb => dark green colours
+## 2. [1], [2] transitions  from megaherb to other (herb small, non-herb large) => army green-deep orange 
+## 3. [4], [5] transition from herb small to other (non-herb large, non-herb small) => yellow-brown
+## 4. [7], [9] transition from other (non herb large, non herb small) to herb small => brownish
+## 5. [8], [10] transitions  between small and large non herbivores => darkbrown-black
 
 
-traits4_10cols <- setNames(c("#40004b", "#9970ab","#00441b", "#762a83", "#e7d4e8", "#1b7837", "#d9f0d3", "#de77ae","#b8e186", "#8e0152" ), c(unique(plot_df$transition)))
-
-##
-
-myColours = c("#40004b", "#9970ab","#00441b", "#762a83", "#e7d4e8", "#1b7837", "#d9f0d3", "#de77ae","#b8e186", "#8e0152" )
-myColoursAlpha <- add.alpha(myColours, alpha=0.2)
-my_cols <- setNames(myColoursAlpha,c(unique(plot_df$transition)))
-
-
-
-my_cols2 <- setNames(myColours,c(unique(plot_df$transition)))
-mean_cols <- setNames( my_cols, c(levels(mean_plotdf$transition)))
-```
-
-```{r}
-plotSimmap(mtrees_M[[1]],cols,fsize=0.1,ftype="i",outline=TRUE,
-      lwd=2,ylim=c(0,Ntip(mtrees_M[[1]])),
-      mar=c(0.1,0.1,1.1,0.1))
-```
-
-```{r, fig.height = 20}
 x <- unique(plot_df$transition)
 plot_df$transition <- factor(plot_df$transition, levels =c(x[3], x[6], x[1], x[2], x[4], x[5], x[7], x[9], x[8], x[10]))
 
+Levels_ordered <- levels(plot_df$transition)
+
+
+
+```
+
+### Set colors
+
+```{r, colors}
+
+
+
+
+# this is for plotting trait states 
+cols1<-setNames(c("#476653", "#eadaa0", "#562c29", "#ab5852", "darkgrey"),c("herb_large", "herb_small", "non_herb_large", "non_herb_small", "total"))
+
+# This is for coloring the phylogeny
+cols<-setNames(c("#476653", "#eadaa0", "#562c29", "#ab5852"),c("herb_large", "herb_small", "non_herb_large", "non_herb_small"))
+
+# This is for transition rates in all directions
+myColours <- c("#87b09a","#476653", # from other (herb small, non-herb large) to megaherb
+               "#838469","#d69e49", # from megaherb to other (herb small, non-herb large)
+               "#eadaa0","#ab5852", # from herb small to other (non-herb large, non-herb small)
+               "#81423e","#562c29", # from other (non herb large, non herb small) to herb small
+               "#2b1615","#160b0b") # between small and large non herbivores
+## This one is used in the script:
+traits4_10cols <- myColours
+# add transparency
+
+myColoursAlpha <- prettyGraphs::add.alpha(myColours, alpha=0.2) 
+
+# Colors with transparency:
+my_cols <- setNames(myColoursAlpha, c(levels(plot_df$transition))) # 
+
+# Colors without transparency:
+my_cols2 <- setNames(myColours,c(levels(plot_df$transition)))
+
+# Without transparency for Mean transitions
+mean_cols <- setNames(my_cols2, c(levels(mean_plotdf$transition)))
+```
+
+### Simmap plot & Summary table
+
+```{r, plot-simmap, fig.height = 25, fig.width = 8}
+par(bg="white",
+    fg="black",
+    col.lab="blue",
+    col.axis="white",
+    xpd=TRUE);
+
+plotSimmap(mtrees_M[[1]],cols,fsize=0.2,ftype="i",outline=TRUE,
+      lwd=1.5,ylim=c(0,Ntip(mtrees_M[[1]])),
+      mar=c(10,0.1,1.1,6))
+geo.legend(alpha = 0.2, cex = 1.2)
+
+#### Simmap Summary
+print(mtrees_M[[1]]$Q)
+
+print(pd_mammals)
+
+```
+
+Table 1: Transition Matrix (Q-Matrix) used to estimate transitions
+between trait states (table created manually from code chunk output
+above)
+
+|                    | herb large       | herb small       | non-herb large   | non-herb small   |
+|---------------|---------------|---------------|---------------|---------------|
+| **herb large**     | --               | \` 0.0054 \`\`\` | \` 0.0012 \`\`\` | \` 0.0000 \`\`\` |
+| **herb small**     | \` 0.0037 \`\`\` | --               | \` 0.0003 \`\`\` | \` 0.0129 \`\`\` |
+| **non-herb large** | \` 0.0093 \`\`\` | \` 0.0007 \`\`\` | --               | \` 0.0286 \`\`\` |
+| **non-herb small** | \` 0.0000 \`\`\` | \` 0.0086 \`\`\` | \` 0.0021 \`\`\` | --               |
+
+### Plots
+
+#### 1.1 Panel: lines and dots (untransformed)
+
+```{r, plot1-1, fig.height = 20}
+ggplot()+
+     geom_line(aes(x = time_rounded, y = N, col = transition),
+               data = plot_df, lwd=1.5)+
+     facet_wrap(transition~., nrow= 10)+
+     scale_color_manual(values=my_cols2,
+                        aesthetics = c("colour"))+
+     #theme_light()+
+     theme(legend.position="none")+
+     scale_x_reverse()+
+     ylab("Cumulative Number of Transitions") +
+     xlab("Time since Present (Ma) [Resolution 1 Ma]") +
+  theme_light()
+
+
+ggplot()+
+     geom_point(aes(x = time_rounded, y = N, fill = transition), shape = 23,
+               data = plot_df)+
+     facet_wrap(transition~., nrow= 10)+
+     scale_color_manual(values=my_cols2,
+                        aesthetics = c("colour"))+
+     #theme_light()+
+     theme(legend.position="none")+
+     scale_x_reverse()+
+     ylab("Cumulative Number of Transitions") +
+     xlab("Time since Present (Ma) [Resolution 1 Ma]") +
+  theme_light()
+
+
+#### Cut to last 45 MA
+
+ggplot()+
+     geom_line(aes(x = time_rounded, y = N, col = transition),
+               data = plot_df, lwd=1.5)+
+     facet_wrap(transition~., nrow= 10)+
+     scale_color_manual(values=my_cols2,
+                        aesthetics = c("colour"))+
+     #theme_light()+
+     theme(legend.position="none")+
+     ylab("Cumulative Number of Transitions") +
+     xlab("Time since Present (Ma) [Resolution 1 Ma]") +
+  theme_light()+
+  xlim(45, 0)
+
+
+ggplot()+
+     geom_point(aes(x = time_rounded, y = N, fill = transition), shape = 23,
+               data = plot_df)+
+     facet_wrap(transition~., nrow= 10)+
+     scale_color_manual(values=my_cols2,
+                        aesthetics = c("colour"))+
+     #theme_light()+
+     theme(legend.position="none")+
+     ylab("Cumulative Number of Transitions") +
+     xlab("Time since Present (Ma) [Resolution 1 Ma]") +
+  theme_light()+
+  xlim(45, 0)
+
+```
+
+#### 1.2 Panel: lines and dots (log-transformed rates)
+
+```{r, plot1-2, fig.height = 20}
+range(plot_df$N)
 
 ggplot()+
      geom_line(aes(x = time_rounded, y = log(N), col = transition),
@@ -333,7 +434,6 @@ ggplot()+
                         aesthetics = c("colour"))+
      #theme_light()+
      theme(legend.position="none")+
-     scale_x_reverse()+
      ylab("log Cumulative Number of Transitions") +
      xlab("Time since Present (Ma) [Resolution 1 Ma]") +
   theme_light()+
@@ -348,23 +448,73 @@ ggplot()+
                         aesthetics = c("colour"))+
      #theme_light()+
      theme(legend.position="none")+
-     scale_x_reverse()+
      ylab("log Cumulative Number of Transitions") +
      xlab("Time since Present (Ma) [Resolution 1 Ma]") +
   theme_light()+
   xlim(45, 0)
-
 ```
+
+#### 2.1 Stacked Bar graph (untransformed)
+
+```{r, plot2-1}
+ggplot()+
+  geom_col(aes(x = time_rounded, y = N, fill = transition),
+           data = plot_df)+
+  # geom_line(aes(x = time_rounded, y = N, fill = transition, col = transition),
+  #          data = plot_df)+
+  #facet_wrap(transition~., nrow= 10)+
+  scale_color_manual(values=my_cols2,
+                     aesthetics = c("fill"))+
+  theme_light()+
+    theme(legend.position="none")+
+  scale_x_reverse()+
+    ylab("Cumulative Number of Transitions") +
+  xlab("Time since Present (Ma) [Resolution 1 Ma]") 
+
+
+
+Fig1a_M <- ggplot()+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+           data = plot_df %>% filter(transition == Levels_ordered[10]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+           data = plot_df %>% filter(transition == Levels_ordered[9]))+ 
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+           data = plot_df %>% filter(transition == Levels_ordered[8]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[7]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[6], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[6]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+           data = plot_df %>% filter(transition == Levels_ordered[5]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[4], col = "white", 
+           data = plot_df %>% filter(transition == Levels_ordered[4]))+
+  geom_col(aes(x = time_rounded, y = N), fill =  myColoursAlpha[3], col = "white",
+           data = plot_df %>% filter(transition == Levels_ordered[3]))+
+  geom_col(aes(x = time_rounded, y = N), fill =  myColoursAlpha[2], col = "black", 
+           data = plot_df %>% filter(transition == Levels_ordered[2]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[1], col = "black",
+           data = plot_df %>% filter(transition == Levels_ordered[1]))+
+  ylab("Cumulative Number of Transitions") +
+  xlab("Time since Present (Ma) [Resolution 1 Ma]") + 
+  theme_classic()+
+  #scale_fill_manual(values = mean_cols)+
+  labs(title ="Number of transitions per 1 million years (Mammals)")+
+  scale_x_reverse()
+
+Fig1a_M
+```
+
+#### 2.2 Stacked Bar graph (log-transformed)
 
 ```{r}
 ggplot()+
-  geom_col(aes(x = time_rounded, y = log(N), fill = transition, col = transition),
+  geom_col(aes(x = time_rounded, y = log(N), fill = transition),
            data = plot_df)+
-  geom_line(aes(x = time_rounded, y = log(N), fill = transition, col = transition),
-           data = plot_df)+
+  # geom_line(aes(x = time_rounded, y = N, fill = transition, col = transition),
+  #          data = plot_df)+
   #facet_wrap(transition~., nrow= 10)+
-  scale_color_manual(values=my_cols,
-                     aesthetics = c("colour", "fill"))+
+  scale_color_manual(values=my_cols2,
+                     aesthetics = c("fill"))+
   theme_light()+
     theme(legend.position="none")+
   scale_x_reverse()+
@@ -375,38 +525,38 @@ ggplot()+
 
 
 
-Fig1a_M <- ggplot()+
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#40004b", col = "#40004b",
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[1]))+
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#9970ab", col = "#9970ab", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[2]))+
-
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#762a83", col = "#762a83", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[4]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#e7d4e8", col = "#e7d4e8", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[5]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#1b7837", col = "#1b7837", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[6]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#d9f0d3", col = "#d9f0d3", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[7]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#de77ae", col = "#de77ae", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[8]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#b8e186", col = "#b8e186", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[9]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#8e0152", col = "#8e0152", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[10]))+    
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#00441b", col = "#00441b", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[3]))+
-  ylab("Cumulative Number of Transitions") +
+Fig1a_M_log <- ggplot()+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+           data = plot_df %>% filter(transition == Levels_ordered[10]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+           data = plot_df %>% filter(transition == Levels_ordered[9]))+ 
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+           data = plot_df %>% filter(transition == Levels_ordered[8]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[7]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[6], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[6]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+           data = plot_df %>% filter(transition == Levels_ordered[5]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[4], col = "white", 
+           data = plot_df %>% filter(transition == Levels_ordered[4]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill =  myColoursAlpha[3], col = "white",
+           data = plot_df %>% filter(transition == Levels_ordered[3]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill =  myColoursAlpha[2], col = "black", 
+           data = plot_df %>% filter(transition == Levels_ordered[2]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[1], col = "black",
+           data = plot_df %>% filter(transition == Levels_ordered[1]))+
+  ylab("log Cumulative Number of Transitions") +
   xlab("Time since Present (Ma) [Resolution 1 Ma]") + 
   theme_classic()+
   scale_fill_manual(values = mean_cols)+
   labs(title ="Number of transitions per 1 million years (Mammals)")+
   scale_x_reverse()
-
 ```
 
-```{r}
+#### 3.1 Mean number of transitions (untransformed)
+
+```{r, plot3, message = F, warning=F}
 ## Mean cumulative rates (averaged across simulations)
 plot_df <- changes_table_Mammals %>% 
   mutate(time_rounded = round(time_new, 0)) %>% 
@@ -417,27 +567,26 @@ plot_df <- changes_table_Mammals %>%
   summarise(N = mean(mean_N))
 
 Fig1b_M <- ggplot()+
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#40004b", col = "#40004b",
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[1]))+
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#9970ab", col = "#9970ab", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[2]))+
-
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#762a83", col = "#762a83", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[4]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#e7d4e8", col = "#e7d4e8", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[5]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#1b7837", col = "#1b7837", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[6]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#d9f0d3", col = "#d9f0d3", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[7]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#de77ae", col = "#de77ae", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[8]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#b8e186", col = "#b8e186", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[9]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#8e0152", col = "#8e0152", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[10]))+    
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#00441b", col = "#00441b", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[3]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+           data = plot_df %>% filter(transition == Levels_ordered[10]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+           data = plot_df %>% filter(transition == Levels_ordered[9]))+ 
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+           data = plot_df %>% filter(transition == Levels_ordered[8]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[7]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[6], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[6]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+           data = plot_df %>% filter(transition == Levels_ordered[5]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[4], col = "white", 
+           data = plot_df %>% filter(transition == Levels_ordered[4]))+
+  geom_col(aes(x = time_rounded, y = N), fill =  myColoursAlpha[3], col = "white",
+           data = plot_df %>% filter(transition == Levels_ordered[3]))+
+  geom_col(aes(x = time_rounded, y = N), fill =  myColoursAlpha[2], col = "black", 
+           data = plot_df %>% filter(transition == Levels_ordered[2]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[1], col = "black",
+           data = plot_df %>% filter(transition == Levels_ordered[1]))+
   ylab("Mean Cumulative Number of Transitions") +
   xlab("Time since Present (Ma) [Resolution 1 Ma]") + xlim(45, 0) +
   theme_classic()+
@@ -451,152 +600,277 @@ gridExtra::grid.arrange(Fig1a_M, Fig1b_M, nrow = 2)
 ## Together ====================== ###
 ### Export via Pane -> Export -> as PDF -> Cairo device -> width 6 x height 3.5: Name : Mammals_CumTrans_Bar.pdf
 ggplot()+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#40004b", col = "#40004b",
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[1]))+
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#9970ab", col = "#9970ab", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[2]))+
-
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#762a83", col = "#762a83", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[4]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#e7d4e8", col = "#e7d4e8", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[5]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#1b7837", col = "#1b7837", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[6]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#d9f0d3", col = "#d9f0d3", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[7]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#de77ae", col = "#de77ae", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[8]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#b8e186", col = "#b8e186", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[9]))+
-    geom_col(aes(x = time_rounded, y = log(N)), fill = "#8e0152", col = "#8e0152", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[10]))+    
-  geom_col(aes(x = time_rounded, y = log(N)), fill = "#00441b", col = "#00441b", alpha = 0.2,
-           data = plot_df %>% filter(transition == unique(plot_df$transition)[3]))+
-  ylim(0, 50)+ ylab("Cumulative Number of Transitions") +
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+           data = plot_df %>% filter(transition == Levels_ordered[10]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+           data = plot_df %>% filter(transition == Levels_ordered[9]))+ 
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+           data = plot_df %>% filter(transition == Levels_ordered[8]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[7]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[6], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[6]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+           data = plot_df %>% filter(transition == Levels_ordered[5]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[4], col = "white", 
+           data = plot_df %>% filter(transition == Levels_ordered[4]))+
+  geom_col(aes(x = time_rounded, y = N), fill =  myColoursAlpha[3], col = "white",
+           data = plot_df %>% filter(transition == Levels_ordered[3]))+
+  geom_col(aes(x = time_rounded, y = N), fill =  myColoursAlpha[2], col = "black", 
+           data = plot_df %>% filter(transition == Levels_ordered[2]))+
+  geom_col(aes(x = time_rounded, y = N), fill = myColoursAlpha[1], col = "black",
+           data = plot_df %>% filter(transition == Levels_ordered[1]))+
+  ylab("Cumulative Number of Transitions") +
   xlim(230, -2) + xlab("Time since Present (Ma) [Resolution 1 Ma]") +
   theme_classic()+
   scale_fill_manual(values = mean_cols)+
   labs(title ="Number of transitions per 1 million years (Megaherbivores)")
+```
+
+#### 3.2 Mean number of transitions (log-transformed)
+
+```{r, message = F, warning=F}
+## Mean cumulative rates (averaged across simulations)
+plot_df <- changes_table_Mammals %>% 
+  mutate(time_rounded = round(time_new, 0)) %>% 
+  group_by(transition, N_sim, time_rounded) %>%
+  summarise(mean_N = mean(length(trans_no))) %>%
+  ungroup() %>%
+  group_by(transition, time_rounded) %>%
+  summarise(N = mean(mean_N))
+
+Fig1b_M_log <- ggplot()+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+           data = plot_df %>% filter(transition == Levels_ordered[10]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+           data = plot_df %>% filter(transition == Levels_ordered[9]))+ 
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+           data = plot_df %>% filter(transition == Levels_ordered[8]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[7]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[6], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[6]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+           data = plot_df %>% filter(transition == Levels_ordered[5]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[4], col = "white", 
+           data = plot_df %>% filter(transition == Levels_ordered[4]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill =  myColoursAlpha[3], col = "white",
+           data = plot_df %>% filter(transition == Levels_ordered[3]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill =  myColoursAlpha[2], col = "black", 
+           data = plot_df %>% filter(transition == Levels_ordered[2]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[1], col = "black",
+           data = plot_df %>% filter(transition == Levels_ordered[1]))+
+  ylab("Mean Cumulative Number of Transitions") +
+  xlab("Time since Present (Ma) [Resolution 1 Ma]") + xlim(45, 0) +
+  theme_classic()+
+  scale_fill_manual(values = mean_cols)+
+  labs(title ="Mean Number of transitions per 1 million years (Mammals)")
 
 
+gridExtra::grid.arrange(Fig1a_M_log, Fig1b_M_log, nrow = 2)
 
 
+## Together ====================== ###
+### Export via Pane -> Export -> as PDF -> Cairo device -> width 6 x height 3.5: log(N)ame : Mammals_CumTrans_Bar.pdf
+ggplot()+
+    geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+           data = plot_df %>% filter(transition == Levels_ordered[10]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+           data = plot_df %>% filter(transition == Levels_ordered[9]))+ 
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+           data = plot_df %>% filter(transition == Levels_ordered[8]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[7]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[6], col = myColoursAlpha[7], 
+           data = plot_df %>% filter(transition == Levels_ordered[6]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+           data = plot_df %>% filter(transition == Levels_ordered[5]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[4], col = "white", 
+           data = plot_df %>% filter(transition == Levels_ordered[4]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill =  myColoursAlpha[3], col = "white",
+           data = plot_df %>% filter(transition == Levels_ordered[3]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill =  myColoursAlpha[2], col = "black", 
+           data = plot_df %>% filter(transition == Levels_ordered[2]))+
+  geom_col(aes(x = time_rounded, y = log(N)), fill = myColoursAlpha[1], col = "black",
+           data = plot_df %>% filter(transition == Levels_ordered[1]))+
+  ylab("Cumulative Number of Transitions") +
+  xlim(230, -2) + xlab("Time since Present (Ma) [Resolution 1 Ma]") +
+  theme_classic()+
+  scale_fill_manual(values = mean_cols)+
+  labs(title ="Number of transitions per 1 million years (Megaherbivores)")
+```
+
+#### 4.1 Lines-Rates plot (untransformed)
+
+```{r}
 # average and mean transition times (cumulative)
 p1 <- ggplot()+
   geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#40004b", col = "#40004b", alpha = 0.3,
+             shape = 21, fill = myColoursAlpha[10], col = myColoursAlpha[10], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[1]))+  
+             filter(transition == Levels_ordered[10]))+
   geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#9970ab", col = "#9970ab", alpha = 0.3,
+             shape = 21, fill = myColoursAlpha[9], col = myColoursAlpha[9], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[2]))+  
+             filter(transition == Levels_ordered[9]))+  
   geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21,  fill = "#762a83", col = "#762a83", alpha = 0.3,
+             shape = 21, fill = myColoursAlpha[8], col = myColoursAlpha[8], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[4]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#e7d4e8", col = "#e7d4e8", alpha = 0.3,
+             filter(transition == Levels_ordered[8]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[7], col = myColoursAlpha[7], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[5]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#1b7837", col = "#1b7837", alpha = 0.3,
+             filter(transition == Levels_ordered[7]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[6], col = myColoursAlpha[6], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[6]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#d9f0d3", col = "#d9f0d3", alpha = 0.3,
+             filter(transition == Levels_ordered[6]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[5], col = myColoursAlpha[5], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[7]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#de77ae", col = "#de77ae", alpha = 0.3,
+             filter(transition == Levels_ordered[5]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[4], col = myColoursAlpha[4], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[8]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#b8e186", col = "#b8e186", alpha = 0.3,
+             filter(transition == Levels_ordered[4]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[3], col = myColoursAlpha[3], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[9]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21, fill = "#8e0152", col = "#8e0152", alpha = 0.3,
+             filter(transition == Levels_ordered[3]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[2], col = myColoursAlpha[2], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[10]))+  
-  geom_point(aes(x = time_new, y = trans_no), 
-             shape = 21,  fill = "#00441b", col = "#00441b", alpha = 0.3,
+             filter(transition == Levels_ordered[2]))+
+    geom_point(aes(x = time_new, y = trans_no), 
+             shape = 21, fill = myColoursAlpha[1], col = myColoursAlpha[1], 
              data = changes_table_Mammals %>% 
-               filter(transition == unique(mean_plotdf$transition)[3]))+
+             filter(transition == Levels_ordered[1]))+
   #scale_x_reverse()+
-  ylim(0, 50)+
-  xlim(230, -5) #+theme_classic()
+  xlim(230, -5) +theme_classic()
 
 
 p1 + 
-  geom_point(aes(x = avg_time, y = trans_no), shape = 25, col = "black",  fill = myColours[1], 
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[1])) +
-  geom_point(aes(x = avg_time, y = trans_no), shape = 25, col = "black", fill= myColours[2],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[2]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 24, col = "grey", fill= myColours[3],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[3]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 23, col = "black", fill= myColours[4],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[4]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "black", fill= myColours[5],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[5]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 24, col = "grey", fill= myColours[6],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[6]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "black", fill= myColours[7],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[7]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 20, col = "black", fill= myColours[8],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[8]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "black", fill= myColours[9],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[9]))+
-  geom_point(aes(x = avg_time, y = trans_no), shape = 23, col = "black", fill= myColours[10],
-             data = mean_plotdf %>% filter(transition == unique(mean_plotdf$transition)[10]))
+  geom_point(aes(x = avg_time, y = trans_no), shape = 24, col = "black",  fill = myColours[1], 
+             data = mean_plotdf %>% filter(transition == Levels_ordered[1]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 24, col = "black", fill = myColours[2],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[2]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 25, col = "black", fill = myColours[3],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[3]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 25, col = "black", fill = myColours[4],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[4]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 23, col = "black", fill = myColours[5],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[5]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 23, col = "black", fill = myColours[6],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[6]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "black", fill = myColours[7],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[7]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "black", fill = myColours[8],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[8]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "grey", fill = myColours[9],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[9]))+
+  geom_point(aes(x = avg_time, y = trans_no), shape = 21, col = "white", fill = myColours[10],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[10]))
 
 
 
-#########
-# changes_table_Mammals_full <- changes_table_Mammals_full %>% 
-#   mutate(time_new = age - time) %>% 
-#   mutate(time_new = round(time_new,5)) %>% 
-#   select(-time)
-# 
-# 
-# changes_table_Mammals_full %>% 
-#   mutate(time_rounded = round(time_new, 0)) %>% 
-#   group_by(transition, time_rounded) %>% summarise(N = n()) %>% 
-#   distinct() %>%
-#   
-#   ggplot()+
-#   geom_col(aes(x = time_rounded, y = N, fill = transition, alpha = 0.5))+
-#   ylim(0, 50)+
-#   xlim(230, -5) #+theme_classic()
-# 
-# 
-# changes_table_Mammals_full
+```
 
+#### 4.2 Lines-Rates plot (log-transformed)
+
+```{r}
+# average and mean transition times (cumulative)
+p2 <- ggplot()+
+   geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[10], col = myColoursAlpha[10], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[10]))+
+  geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[9], col = myColoursAlpha[9], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[9]))+  
+  geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[8], col = myColoursAlpha[8], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[8]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[7], col = myColoursAlpha[7], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[7]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[6], col = myColoursAlpha[6], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[6]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[5], col = myColoursAlpha[5], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[5]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[4], col = myColoursAlpha[4], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[4]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[3], col = myColoursAlpha[3], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[3]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[2], col = myColoursAlpha[2], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[2]))+
+    geom_point(aes(x = time_new, y = log(trans_no)), 
+             shape = 21, fill = myColoursAlpha[1], col = myColoursAlpha[1], 
+             data = changes_table_Mammals %>% 
+             filter(transition == Levels_ordered[1]))+
+  #scale_x_reverse()+
+  xlim(230, -5) +theme_classic()
+
+
+p2 + 
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 24, col = "black",  fill = myColours[1], 
+             data = mean_plotdf %>% filter(transition == Levels_ordered[1]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 24, col = "black", fill = myColours[2],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[2]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 25, col = "black", fill = myColours[3],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[3]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 25, col = "black", fill = myColours[4],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[4]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 23, col = "black", fill = myColours[5],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[5]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 23, col = "black", fill = myColours[6],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[6]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 21, col = "black", fill = myColours[7],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[7]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 21, col = "black", fill = myColours[8],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[8]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 21, col = "grey", fill = myColours[9],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[9]))+
+  geom_point(aes(x = avg_time, y = log(trans_no)), shape = 21, col = "white", fill = myColours[10],
+             data = mean_plotdf %>% filter(transition == Levels_ordered[10]))
+  
+  
 ```
 
 ## Quick LTT plot
 
-```{r, eval = F}
+```{r, ltt, eval = F}
 ##### Quick plot =================
 tree_mammals <- ladderize(readRDS("../input/Mammals/Processed/Mammals_MCC_drop.rds"))
-mammals_simmap <- readRDS("../output/RDS/Mammals_4traits_simmap_100.rds")
+mammals_simmap <- mtrees_M
 trait <- readRDS("../input/Mammals/Processed/Mammals_traits_drop.rds")
-obj <- ltt.multiSimmap(mammals_simmap, plot = F)
+obj <- ltt.simmap(mammals_simmap[[1]], plot = F)
 
 layout(matrix(c(1,2),2,1),heights=c(0.4,0.6))
 
-cols<-setNames(c("#009E50", "#709E01", "#E69F00", "#E68F90", "darkgrey"),c("herb_large", "herb_small", "non_herb_large", "non_herb_small", "total"))
+# this is for plotting trait states 
+cols1<-setNames(c("#476653", "#eadaa0", "#562c29", "#ab5852", "darkgrey"),c("herb_large", "herb_small", "non_herb_large", "non_herb_small", "total"))
 
 
-
-c("#009E50", "#709E01", "#E69F00", "#E68F90", "darkgrey" )
-plot(mammals_simmap[[1]],cols,ftype="off",lwd=2,
+plot(mammals_simmap[[1]],cols1,ftype="off",lwd=2,
     mar=c(0,4.1,1.1,1.1))
 grid()
-legend("topleft",names(cols),pch=22,pt.bg=cols,
+legend("topleft",names(cols1),pch=22,pt.bg=cols1,
     bty="n",cex=0.8,pt.cex=1.2)
 par(mar=c(5.1,4.1,0,1.1))
-plot(obj,colors=cols,bty="n",las=1,lwd=4,show.tree=FALSE,
+plot(obj,colors=cols1,bty="n",las=1,lwd=4,show.tree=FALSE,
     legend=FALSE,ylim=c(1,Ntip(mammals_tree)),
     xlab="time (above the root)")
 grid()
