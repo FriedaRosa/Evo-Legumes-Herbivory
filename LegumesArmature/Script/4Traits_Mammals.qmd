@@ -8,6 +8,11 @@ editor: visual
 ```{r, cleaning, message=FALSE}
 rm(list=ls())
 gc()
+
+library(ape)
+library(phytools)
+library(evobiR)
+library(geiger)
 ```
 
 ## Preprocessing
@@ -210,6 +215,156 @@ mtrees_M <- readRDS("~/GitHub/Evo-Legumes-Herbivory/LegumesArmature/output/RDS/M
 pd_mammals <- readRDS("../output/RDS/pd_mtrees_mammals_4traits.rds")
 
 
+```
+
+```{r}
+plotSimmap(mtrees_M[[1]],ftype="i",fsize=0.6,ylim=c(-1,Ntip(mtrees_M[[1]])))
+obj<-markChanges(mtrees_M[[1]],plot=FALSE)
+add.simmap.legend(x=0,y=-1,colors=
+    setNames(palette()[1:length(unique(getStates(mtrees_M[[1]],"tips")))],
+    sort(unique(getStates(mtrees_M[[1]],"tips")))),prompt=FALSE,vertical=FALSE)
+points(obj,pch=8)
+
+
+```
+
+```{r}
+c <- viridis::viridis_pal()(4)
+states <- unique(getStates(mtrees_M[[1]], "tips"))
+
+cols1 <- setNames(c, states)
+syms <- setNames(c(21, 22, 24, 23), states)
+
+# cols1 <- setNames(c("white","black" ), c("2_dry" ,"1_moist"))
+# cols2 <- setNames(c("black","white" ), c("2_dry" ,"1_moist"))
+#cols2<-viridis_pal()(5)
+#########
+mtree <- mtrees_M[[1]]
+pdf("MD_Trans_FS2.pdf", paper="a4")
+par(bg="light grey",
+    fg="black",
+    col.lab="light grey",
+    col.axis="light grey", 
+    mar=c(6, 2, 2, 2))
+
+plotSimmap(mtree,ftype="i",fsize=0.6,ylim=c(-1,Ntip(mtree)), xlim=c(0,1.25*max(nodeHeights(mtree))), col=cols1, outline = F)
+geo.legend(colors=c("#697689", "#abb8c3", "#555555"), alpha=0.2)
+
+
+
+# plot(obj,xlim=c(0,1.25*max(nodeHeights(tree))), ftype="i",fsize=0.1, lwd=1, outline=F);
+
+
+## so we can see the changes more clearly:
+markChanges<-function(mtree,colors=cols1,cex=1,lwd=2){
+  states<-sort(unique(getStates(mtree)))
+  if(is.null(colors)) colors<-setNames(palette()[1:length(states)],
+                                       states)
+  obj<-get("last_plot.phylo",envir=.PlotPhyloEnv)
+  nc<-sapply(mtree$maps,length)-1
+  ii<-which(nc>0)
+  nc<-nc[ii]
+  h<-vector()
+  for(i in 1:length(ii)){
+    for(j in 1:nc[i]){
+      ss<-names(tree$maps[[ii[i]]])[j+1]
+      mm<-tree$edge[ii[i],1]
+      dd<-tree$edge[ii[i],2]
+      x<-rep(obj$xx[mm]+cumsum(tree$maps[[ii[i]]])[j],2)
+      y<-c(obj$yy[dd]-0.1*mean(strheight(LETTERS)*cex),
+           obj$yy[dd]+0.1*mean(strheight(LETTERS)*cex))
+      #lines(x,y,lwd=5, col=cols1[[ss]], fill=cols2[[ss]],lend=2)
+      points(x,y, pch = syms[ss], col=cols1[[ss]], bg=cols1[ss], cex=1.5)
+      #h<-c(h,x[1])
+    }
+  }
+  #invisible(h)
+}
+
+markChanges(mtree,lwd=3)
+#ggsave(filename="Africa_transition_FSrecon.pdf", plot=last_plot(), device="pdf")
+
+
+add.simmap.legend(colors=sapply(setNames(cols1,c("Open -> Closed", "Closed -> Open")),
+                                make.transparent,0.8),prompt=FALSE,x=0,y=30,vertical=TRUE)
+dev.off()
+
+```
+
+```{r}
+markChanges<-function(tree,colors=NULL,cex=1,lwd=2,plot=TRUE){
+	states<-sort(unique(getStates(tree)))
+	obj<-get("last_plot.phylo",envir=.PlotPhyloEnv)
+	nc<-sapply(tree$maps,length)-1
+	ii<-which(nc>0)
+	nc<-nc[ii]
+	xx<-yy<-vector()
+	for(i in 1:length(ii)){
+		for(j in 1:nc[i]){
+			ss<-names(tree$maps[[ii[i]]])[j+1]
+			mm<-tree$edge[ii[i],1]
+			dd<-tree$edge[ii[i],2]
+			x<-c(obj$xx[mm]+cumsum(tree$maps[[ii[i]]])[j])
+			y<-c(obj$yy[dd]-0.5*mean(strheight(LETTERS)*cex))
+			if(plot) lines(x,y,lwd=lwd,col=colors[ss],lend=2)
+			xx<-c(xx,setNames(x[1],
+				paste(names(tree$maps[[ii[i]]])[j:(j+1)],
+				collapse="->")))
+			yy<-c(yy,mean(y))
+		}
+	}
+	XY<-cbind(xx,yy)
+	colnames(XY)<-c("x","y")
+	invisible(XY)
+}
+
+
+
+
+```
+
+```{r}
+markChanges2<-function(tree,colors=NULL,cex=1,lwd=2,plot=TRUE){
+	states<-sort(unique(getStates(tree)))
+	if(is.null(colors)) colors<-setNames(palette()[1:length(states)],
+		states)
+	obj<-get("last_plot.phylo",envir=.PlotPhyloEnv)
+	nc<-sapply(tree$maps,length)-1
+	ii<-which(nc>0)
+	nc<-nc[ii]
+	xx<-yy<-vector()
+	for(i in 1:length(ii)){
+		for(j in 1:nc[i]){
+			ss<-names(tree$maps[[ii[i]]])[j+1]
+			mm<-tree$edge[ii[i],1]
+			dd<-tree$edge[ii[i],2]
+			x<-rep(obj$xx[mm]+cumsum(tree$maps[[ii[i]]])[j],2)
+			y<-c(obj$yy[dd]-0.5*mean(strheight(LETTERS)*cex),
+				obj$yy[dd]+0.5*mean(strheight(LETTERS)*cex))
+			if(plot) lines(x,y,lwd=lwd,col=colors[ss],lend=2)
+			xx<-c(xx,setNames(x[1],
+				paste(names(tree$maps[[ii[i]]])[j:(j+1)],
+				collapse="->")))
+			yy<-c(yy,mean(y))
+		}
+	}
+	XY<-cbind(xx,yy)
+	colnames(XY)<-c("x","y")
+	invisible(XY)
+}
+
+plotSimmap(mtree,type = "fan", ftype="off",fsize=0.6,ylim=c(-1,Ntip(mtree)), xlim=c(0,1.25*max(nodeHeights(mtree))), col=cols1, outline = F)
+
+plotSimmap(mtree, ftype="off",fsize=0.6, cols1)
+
+# 
+# 
+# geo.legend(colors=c("#697689", "#abb8c3", "#555555"), alpha=0.2)
+markChanges(mtree, cols1)
+
+
+obj <- density(mtrees_M, method="changes")
+plot.changesMap(obj)
 ```
 
 ### Create Plot dataframe
